@@ -137,32 +137,12 @@ impl BitGrid {
     /// SAFETY: `x` must be in `0..width`, `y` must be in `0..height`
     #[inline(always)]
     pub unsafe fn get_neighbors_unchecked(&self, x: i32, y: i32) -> EnumSet<Direction> {
-        let mut dirs = EnumSet::new();
-        if self.get_unchecked(x - 1, y - 1) {
-            dirs |= Direction::NorthWest;
-        }
-        if self.get_unchecked(x, y - 1) {
-            dirs |= Direction::North;
-        }
-        if self.get_unchecked(x + 1, y - 1) {
-            dirs |= Direction::NorthEast;
-        }
-        if self.get_unchecked(x - 1, y) {
-            dirs |= Direction::West;
-        }
-        if self.get_unchecked(x + 1, y) {
-            dirs |= Direction::East;
-        }
-        if self.get_unchecked(x - 1, y + 1) {
-            dirs |= Direction::SouthWest;
-        }
-        if self.get_unchecked(x, y + 1) {
-            dirs |= Direction::South;
-        }
-        if self.get_unchecked(x + 1, y + 1) {
-            dirs |= Direction::SouthEast;
-        }
-        dirs
+        let upper = self.get_row_unchecked(x - 1, y - 1);
+        let middle = self.get_row_unchecked(x - 1, y);
+        let lower = self.get_row_unchecked(x - 1, y + 1);
+        let bits =
+            upper & 0b111 | (middle & 0b1) << 3 | (middle & 0b100) << 2 | (lower & 0b111) << 5;
+        EnumSet::from_u64_truncated(bits)
     }
 
     #[inline(always)]
