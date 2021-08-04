@@ -1,12 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use pathfinding::algs::{AStarSearcher, DijkstraSearcher};
-use pathfinding::domains::bitgrid;
-use pathfinding::domains::BitGrid;
-use pathfinding::traits::GValue;
-use pathfinding::util::{GridPool, octile_heuristic};
-use pathfinding::NodePool;
+use pathfinding::astar;
+use pathfinding::bitgrid::{BitGrid, create_tmap, jps, no_corner_cutting};
+use pathfinding::util::{octile_heuristic, zero_heuristic, GridPool};
+use qcell::LCellOwner;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -19,6 +17,7 @@ struct Options {
 enum Algorithm {
     Dijkstra,
     AStar,
+    Jps,
 }
 
 impl FromStr for Algorithm {
@@ -28,6 +27,7 @@ impl FromStr for Algorithm {
         Ok(match s {
             "dijkstra" => Algorithm::Dijkstra,
             "astar" => Algorithm::AStar,
+            "jps" => Algorithm::Jps,
             _ => return Err("invalid algorithm"),
         })
     }
@@ -41,54 +41,104 @@ pub fn main() {
 
     match options.algorithm {
         Algorithm::Dijkstra => {
-            let mut searcher: DijkstraSearcher<(i32, i32), _, _> = DijkstraSearcher::new(
-                GridPool::new(map.width(), map.height()),
-                bitgrid::NoCornerCutting::new(&map),
-            );
+            LCellOwner::scope(|mut owner| {
+                let mut pool = GridPool::new(map.width(), map.height());
 
-            let t = std::time::Instant::now();
-            for instance in instances {
                 let t = std::time::Instant::now();
-                searcher.search(instance.from, Some(instance.to));
-                println!(
-                    "{:?} -> {:?}: {:.2?}",
-                    instance.from,
-                    instance.to,
-                    t.elapsed()
-                );
-                let len = searcher.node_pool.generate(instance.to).get_g();
-                assert_eq!(
-                    (len * 1_000.0).round() as i64,
-                    (instance.expected_length * 1_000.0).round() as i64
-                );
-            }
-            eprintln!("Total: {:.2?}", t.elapsed());
+                for instance in instances {
+                    let t = std::time::Instant::now();
+                    astar(
+                        &mut pool,
+                        &mut owner,
+                        no_corner_cutting(&map),
+                        zero_heuristic(),
+                        instance.from.0,
+                        instance.from.1,
+                        instance.to.0,
+                        instance.to.1,
+                    );
+                    println!(
+                        "{:?} -> {:?}: {:.2?}",
+                        instance.from,
+                        instance.to,
+                        t.elapsed()
+                    );
+                    let dst = pool.get_mut(instance.to.0, instance.to.1, &mut owner);
+                    let len = owner.ro(dst).g;
+                    assert_eq!(
+                        (len * 1_000.0).round() as i64,
+                        (instance.expected_length * 1_000.0).round() as i64
+                    );
+                }
+                eprintln!("Total: {:.2?}", t.elapsed());
+            });
         }
         Algorithm::AStar => {
-            let mut searcher: AStarSearcher<(i32, i32), _, _, _> = AStarSearcher::new(
-                GridPool::new(map.width(), map.height()),
-                bitgrid::NoCornerCutting::new(&map),
-                octile_heuristic((0, 0), 1.0)
-            );
+            LCellOwner::scope(|mut owner| {
+                let mut pool = GridPool::new(map.width(), map.height());
 
-            let t = std::time::Instant::now();
-            for instance in instances {
-                searcher.edge_nav.heuristic = octile_heuristic(instance.to, 1.0);
                 let t = std::time::Instant::now();
-                searcher.search(instance.from, Some(instance.to));
-                println!(
-                    "{:?} -> {:?}: {:.2?}",
-                    instance.from,
-                    instance.to,
-                    t.elapsed()
-                );
-                let len = searcher.node_pool.generate(instance.to).get_g();
-                assert_eq!(
-                    (len * 1_000.0).round() as i64,
-                    (instance.expected_length * 1_000.0).round() as i64
-                );
-            }
-            eprintln!("Total: {:.2?}", t.elapsed());
+                for instance in instances {
+                    let t = std::time::Instant::now();
+                    astar(
+                        &mut pool,
+                        &mut owner,
+                        no_corner_cutting(&map),
+                        octile_heuristic(instance.to, 1.0),
+                        instance.from.0,
+                        instance.from.1,
+                        instance.to.0,
+                        instance.to.1,
+                    );
+                    println!(
+                        "{:?} -> {:?}: {:.2?}",
+                        instance.from,
+                        instance.to,
+                        t.elapsed()
+                    );
+                    let dst = pool.get_mut(instance.to.0, instance.to.1, &mut owner);
+                    let len = owner.ro(dst).g;
+                    assert_eq!(
+                        (len * 1_000.0).round() as i64,
+                        (instance.expected_length * 1_000.0).round() as i64
+                    );
+                }
+                eprintln!("Total: {:.2?}", t.elapsed());
+            });
+        }
+        Algorithm::Jps => {
+            LCellOwner::scope(|mut owner| {
+                let mut pool = GridPool::new(map.width(), map.height());
+                let tmap = create_tmap(&map);
+
+                let t = std::time::Instant::now();
+                for instance in instances {
+                    let t = std::time::Instant::now();
+                    astar(
+                        &mut pool,
+                        &mut owner,
+                        jps(&map, &tmap, instance.to),
+                        octile_heuristic(instance.to, 1.0),
+                        instance.from.0,
+                        instance.from.1,
+                        instance.to.0,
+                        instance.to.1,
+                    );
+                    println!(
+                        "{:?} -> {:?}: {:.2?}",
+                        instance.from,
+                        instance.to,
+                        t.elapsed()
+                    );
+                    let dst = pool.get_mut(instance.to.0, instance.to.1, &mut owner);
+                    let len = owner.ro(dst).g;
+                    assert_eq!(
+                        (len * 1_000.0).round() as i64,
+                        (instance.expected_length * 1_000.0).round() as i64
+                    );
+                }
+                eprintln!("Total: {:.2?}", t.elapsed());
+            });
         }
     }
 }

@@ -1,115 +1,77 @@
-use crate::traits::QueueLocation;
-use crate::{NodePool, Queue};
+use qcell::{LCell, LCellOwner};
 
-pub struct PriorityQueue<V, F> {
-    heap: Vec<V>,
-    is_le: F,
+use crate::SearchNode;
+
+pub struct PriorityQueue<'a, 'id> {
+    heap: Vec<&'a LCell<'id, SearchNode>>,
 }
 
-impl<V, F> PriorityQueue<V, F> {
-    pub fn new(is_le: F) -> Self {
-        PriorityQueue {
-            heap: vec![],
-            is_le,
-        }
+impl<'a, 'id> PriorityQueue<'a, 'id> {
+    pub fn new() -> Self {
+        PriorityQueue { heap: vec![] }
     }
-}
 
-impl<V, N, F> Queue<V, N> for PriorityQueue<V, F>
-where
-    V: Copy + Eq,
-    N: QueueLocation,
-    F: Comparator<N>,
-{
-    fn push(&mut self, vertex: V, node_pool: &mut impl NodePool<V, N>) {
-        if !self.contains(vertex, node_pool) {
+    pub fn decrease_key(&mut self, node: &'a LCell<'id, SearchNode>, owner: &mut LCellOwner<'id>) {
+        if !self.contains(node, owner) {
             let index = self.heap.len();
-            self.heap.push(vertex);
-            node_pool.generate(vertex).set_location(index);
-            self.heapify_up(index, node_pool);
+            self.heap.push(node);
+            owner.rw(node).pqueue_location = index;
+            self.heapify_up(index, owner);
             return;
         }
 
-        let node = node_pool.get(vertex).unwrap();
-        let index = node.get_location();
-        if index == 0 {
-            self.heapify_down(0, node_pool);
-            return;
-        }
-
-        let parent = node_pool.get(self.heap[(index - 1) / 2]).unwrap();
-        if self.is_le.is_le(parent, node) {
-            self.heapify_down(index, node_pool);
-        } else {
-            self.heapify_up(index, node_pool);
-        }
+        let index = owner.ro(node).pqueue_location;
+        self.heapify_up(index, owner);
     }
 
-    fn pop(&mut self, node_pool: &mut impl NodePool<V, N>) -> Option<V> {
+    pub fn pop(&mut self, owner: &mut LCellOwner<'id>) -> Option<&'a LCell<'id, SearchNode>> {
         match self.heap.len() {
             0 => None,
             1 => self.heap.pop(),
             _ => {
                 let k = self.heap.swap_remove(0);
-                node_pool.generate(self.heap[0]).set_location(0);
-                self.heapify_down(0, node_pool);
+                owner.rw(self.heap[0]).pqueue_location = 0;
+                self.heapify_down(0, owner);
                 Some(k)
             }
         }
     }
 
-    fn clear(&mut self) {
-        self.heap.clear();
-    }
-}
-
-impl<V: Copy + Eq, F> PriorityQueue<V, F> {
-    fn contains<N>(&self, v: V, data: &mut impl NodePool<V, N>) -> bool
-    where
-        N: QueueLocation,
-    {
-        data.get(v)
-            .and_then(|n| self.heap.get(n.get_location()))
-            .map(|&a| a == v)
-            .unwrap_or(false)
+    fn contains(&self, node: &'a LCell<'id, SearchNode>, owner: &mut LCellOwner<'id>) -> bool {
+        self.heap
+            .get(owner.ro(node).pqueue_location)
+            .map_or(false, |&occupant| std::ptr::eq(node, occupant))
     }
 
     #[inline(always)]
-    fn le<N>(&mut self, i: usize, j: usize, data: &mut impl NodePool<V, N>) -> bool
-    where
-        N: QueueLocation,
-        F: Comparator<N>,
-    {
-        self.is_le.is_le(
-            data.get(self.heap[i]).unwrap(),
-            data.get(self.heap[j]).unwrap(),
-        )
+    fn le(&mut self, i: usize, j: usize, owner: &LCellOwner<'id>) -> bool {
+        let a = owner.ro(self.heap[i]);
+        let b = owner.ro(self.heap[j]);
+        if a.lb < b.lb {
+            true
+        } else if a.lb > b.lb {
+            false
+        } else {
+            a.g >= b.g
+        }
     }
 
-    fn heapify_up<N>(&mut self, mut i: usize, data: &mut impl NodePool<V, N>)
-    where
-        N: QueueLocation,
-        F: Comparator<N>,
-    {
+    fn heapify_up(&mut self, mut i: usize, owner: &mut LCellOwner<'id>) {
         while i != 0 {
             let parent = (i - 1) / 2;
-            if self.le(parent, i, data) {
+            if self.le(parent, i, owner) {
                 break;
             }
 
             self.heap.swap(i, parent);
-            data.generate(self.heap[i]).set_location(i);
-            data.generate(self.heap[parent]).set_location(parent);
+            owner.rw(self.heap[i]).pqueue_location = i;
+            owner.rw(self.heap[parent]).pqueue_location = parent;
 
             i = parent;
         }
     }
 
-    fn heapify_down<N>(&mut self, mut i: usize, data: &mut impl NodePool<V, N>)
-    where
-        N: QueueLocation,
-        F: Comparator<N>,
-    {
+    fn heapify_down(&mut self, mut i: usize, owner: &mut LCellOwner<'id>) {
         loop {
             let c1 = i * 2 + 1;
             if c1 >= self.heap.len() {
@@ -117,32 +79,21 @@ impl<V: Copy + Eq, F> PriorityQueue<V, F> {
             }
             let c2 = c1 + 1;
 
-            let smaller_child = if c2 >= self.heap.len() || self.le(c1, c2, data) {
+            let smaller_child = if c2 >= self.heap.len() || self.le(c1, c2, owner) {
                 c1
             } else {
                 c2
             };
 
-            if self.le(i, smaller_child, data) {
+            if self.le(i, smaller_child, owner) {
                 break;
             }
 
             self.heap.swap(i, smaller_child);
-            data.generate(self.heap[i]).set_location(i);
-            data.generate(self.heap[smaller_child])
-                .set_location(smaller_child);
+            owner.rw(self.heap[i]).pqueue_location = i;
+            owner.rw(self.heap[smaller_child]).pqueue_location = smaller_child;
 
             i = smaller_child;
         }
-    }
-}
-
-pub trait Comparator<Node> {
-    fn is_le(&mut self, a: &Node, b: &Node) -> bool;
-}
-
-impl<N, F: Fn(&N, &N) -> bool> Comparator<N> for F {
-    fn is_le(&mut self, a: &N, b: &N) -> bool {
-        self(a, b)
     }
 }

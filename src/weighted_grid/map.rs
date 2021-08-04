@@ -8,7 +8,7 @@ impl<V> WeightedGrid<V> {
     pub fn new(width: i32, height: i32, mut init: impl FnMut(i32, i32) -> V) -> Self {
         let mut cells = vec![];
         for y in -1..height + 1 {
-            for x in -1..width + 1 {
+            for x in -1..width {
                 cells.push(init(x, y));
             }
         }
@@ -61,6 +61,7 @@ impl<V> WeightedGrid<V> {
     #[track_caller]
     #[inline(always)]
     fn bounds_check(&self, x: i32, y: i32) {
+        #[cfg(not(feature = "unsound"))]
         if !(-1..self.width + 1).contains(&x) || !(-1..self.height + 1).contains(&y) {
             panic!("Grid cell ({}, {}) is out of bounds.", x, y);
         }

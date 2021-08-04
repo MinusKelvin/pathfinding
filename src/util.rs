@@ -1,10 +1,10 @@
 use std::f64::consts::SQRT_2;
 
 use enumset::EnumSetType;
+use qcell::{LCell, LCellOwner};
 
-use crate::NodePool;
-use crate::domains::WeightedGrid;
-use crate::traits::{Cost, Destination};
+use crate::weighted_grid::WeightedGrid;
+use crate::SearchNode;
 
 #[derive(Debug, EnumSetType)]
 pub enum Direction {
@@ -25,54 +25,61 @@ pub struct GridEdge {
     pub cost: f64,
 }
 
-impl Destination<(i32, i32)> for GridEdge {
-    fn destination(&self) -> (i32, i32) {
-        self.destination
-    }
-}
-
-impl Cost for GridEdge {
-    fn cost(&self) -> f64 {
-        self.cost
-    }
-}
-
-pub struct GridPool<N> {
+pub struct GridPool<'id> {
     search_num: usize,
-    grid: WeightedGrid<(usize, N)>
+    grid: WeightedGrid<LCell<'id, SearchNode>>,
 }
 
-impl<N: Default> GridPool<N> {
+impl<'id> GridPool<'id> {
     pub fn new(width: i32, height: i32) -> Self {
         GridPool {
             search_num: 0,
-            grid: WeightedGrid::new(width, height, |_, _| (0, N::default()))
+            grid: WeightedGrid::new(width, height, |x, y| {
+                LCell::new(SearchNode {
+                    search_num: 0,
+                    expansions: 0,
+                    pqueue_location: 0,
+                    x,
+                    y,
+                    parent: None,
+                    g: 0.0,
+                    lb: 0.0,
+                })
+            }),
         }
     }
-}
 
-impl<N: Default> NodePool<(i32, i32), N> for GridPool<N> {
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.search_num += 1;
     }
 
-    fn generate(&mut self, (x, y): (i32, i32)) -> &mut N {
-        let (sn, node) = self.grid.get_mut(x, y);
-        if *sn != self.search_num {
-            *sn = self.search_num;
-            *node = N::default();
+    pub fn get(&self, x: i32, y: i32, owner: &LCellOwner<'id>) -> Option<&LCell<'id, SearchNode>> {
+        let cell = self.grid.get(x, y);
+        if owner.ro(cell).search_num == self.search_num {
+            Some(cell)
+        } else {
+            None
         }
-        node
     }
 
-    fn get(&self, (x, y): (i32, i32)) -> Option<&N> {
-        let &(sn, ref node) = self.grid.get(x, y);
-        Some(node)
+    pub fn get_mut(&self, x: i32, y: i32, owner: &mut LCellOwner<'id>) -> &LCell<'id, SearchNode> {
+        let cell = self.grid.get(x, y);
+        if owner.ro(cell).search_num == self.search_num {
+            cell
+        } else {
+            let n = owner.rw(cell);
+            n.lb = f64::INFINITY;
+            n.g = f64::INFINITY;
+            n.expansions = 0;
+            n.search_num = self.search_num;
+            n.parent = None;
+            cell
+        }
     }
 }
 
-pub fn octile_heuristic((tx, ty): (i32, i32), scale: f64) -> impl Fn((i32, i32)) -> f64 {
-    move |(x, y)| {
+pub fn octile_heuristic((tx, ty): (i32, i32), scale: f64) -> impl Fn(i32, i32) -> f64 {
+    move |x, y| {
         let dx = (tx - x).abs();
         let dy = (ty - y).abs();
         let diagonal_moves = dx.min(dy);
@@ -81,10 +88,14 @@ pub fn octile_heuristic((tx, ty): (i32, i32), scale: f64) -> impl Fn((i32, i32))
     }
 }
 
-pub fn manhattan_heuristic((tx, ty): (i32, i32), scale: f64) -> impl Fn((i32, i32)) -> f64 {
-    move |(x, y)| {
+pub fn manhattan_heuristic((tx, ty): (i32, i32), scale: f64) -> impl Fn(i32, i32) -> f64 {
+    move |x, y| {
         let dx = (tx - x).abs();
         let dy = (ty - y).abs();
         (dx + dy) as f64 * scale
     }
+}
+
+pub fn zero_heuristic() -> impl Fn(i32, i32) -> f64 {
+    |_, _| 0.0
 }
