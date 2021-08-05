@@ -32,7 +32,7 @@ pub fn astar<'id>(
     pool: &mut GridPool<'id>,
     owner: &mut LCellOwner<'id>,
     mut expander: impl FnMut(&SearchNode, &mut Vec<Edge>),
-    h: impl Fn(i32, i32) -> f64,
+    mut h: impl FnMut(i32, i32) -> f64,
     src_x: i32,
     src_y: i32,
     goal_x: i32,
