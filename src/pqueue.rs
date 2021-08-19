@@ -1,17 +1,15 @@
-use qcell::{LCell, LCellOwner};
+use crate::{Cell, Owner, SearchNode};
 
-use crate::SearchNode;
-
-pub struct PriorityQueue<'a, 'id> {
-    heap: Vec<&'a LCell<'id, SearchNode>>,
+pub struct PriorityQueue<'a> {
+    heap: Vec<&'a Cell<SearchNode>>,
 }
 
-impl<'a, 'id> PriorityQueue<'a, 'id> {
+impl<'a> PriorityQueue<'a> {
     pub fn new() -> Self {
         PriorityQueue { heap: vec![] }
     }
 
-    pub fn decrease_key(&mut self, node: &'a LCell<'id, SearchNode>, owner: &mut LCellOwner<'id>) {
+    pub fn decrease_key(&mut self, node: &'a Cell<SearchNode>, owner: &mut Owner) {
         if !self.contains(node, owner) {
             let index = self.heap.len();
             self.heap.push(node);
@@ -24,7 +22,7 @@ impl<'a, 'id> PriorityQueue<'a, 'id> {
         self.heapify_up(index, owner);
     }
 
-    pub fn pop(&mut self, owner: &mut LCellOwner<'id>) -> Option<&'a LCell<'id, SearchNode>> {
+    pub fn pop(&mut self, owner: &mut Owner) -> Option<&'a Cell<SearchNode>> {
         match self.heap.len() {
             0 => None,
             1 => self.heap.pop(),
@@ -37,14 +35,14 @@ impl<'a, 'id> PriorityQueue<'a, 'id> {
         }
     }
 
-    fn contains(&self, node: &'a LCell<'id, SearchNode>, owner: &mut LCellOwner<'id>) -> bool {
+    fn contains(&self, node: &'a Cell<SearchNode>, owner: &mut Owner) -> bool {
         self.heap
             .get(owner.ro(node).pqueue_location)
             .map_or(false, |&occupant| std::ptr::eq(node, occupant))
     }
 
     #[inline(always)]
-    fn le(&mut self, i: usize, j: usize, owner: &LCellOwner<'id>) -> bool {
+    fn le(&mut self, i: usize, j: usize, owner: &Owner) -> bool {
         let a = owner.ro(self.heap[i]);
         let b = owner.ro(self.heap[j]);
         if a.lb < b.lb {
@@ -56,7 +54,7 @@ impl<'a, 'id> PriorityQueue<'a, 'id> {
         }
     }
 
-    fn heapify_up(&mut self, mut i: usize, owner: &mut LCellOwner<'id>) {
+    fn heapify_up(&mut self, mut i: usize, owner: &mut Owner) {
         while i != 0 {
             let parent = (i - 1) / 2;
             if self.le(parent, i, owner) {
@@ -71,7 +69,7 @@ impl<'a, 'id> PriorityQueue<'a, 'id> {
         }
     }
 
-    fn heapify_down(&mut self, mut i: usize, owner: &mut LCellOwner<'id>) {
+    fn heapify_down(&mut self, mut i: usize, owner: &mut Owner) {
         loop {
             let c1 = i * 2 + 1;
             if c1 >= self.heap.len() {

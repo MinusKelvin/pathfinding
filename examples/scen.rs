@@ -4,7 +4,7 @@ use std::str::FromStr;
 use pathfinding::bitgrid::{create_tmap, jps, no_corner_cutting, BitGrid};
 use pathfinding::util::{octile_heuristic, zero_heuristic, GridPool};
 use pathfinding::{astar, Edge, SearchNode};
-use qcell::LCellOwner;
+use qcell::TLCellOwner;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -131,36 +131,35 @@ fn run<F, H>(
     F: FnMut(&SearchNode, &mut Vec<Edge>),
     H: Fn(i32, i32) -> f64,
 {
-    LCellOwner::scope(|mut owner| {
-        let mut pool = GridPool::new(width, height);
+    let mut owner = TLCellOwner::new();
+    let mut pool = GridPool::new(width, height);
 
+    let t = std::time::Instant::now();
+    for instance in instances {
+        let (expander, heuristic) = init(instance.to);
         let t = std::time::Instant::now();
-        for instance in instances {
-            let (expander, heuristic) = init(instance.to);
-            let t = std::time::Instant::now();
-            astar(
-                &mut pool,
-                &mut owner,
-                expander,
-                heuristic,
-                instance.from.0,
-                instance.from.1,
-                instance.to.0,
-                instance.to.1,
-            );
-            println!(
-                "{:?} -> {:?}: {:.2?}",
-                instance.from,
-                instance.to,
-                t.elapsed()
-            );
-            let dst = pool.get_mut(instance.to.0, instance.to.1, &mut owner);
-            let len = owner.ro(dst).g;
-            assert_eq!(
-                (len * 1_000.0).round() as i64,
-                (instance.expected_length * 1_000.0).round() as i64
-            );
-        }
-        eprintln!("Total: {:.2?}", t.elapsed());
-    });
+        astar(
+            &mut pool,
+            &mut owner,
+            expander,
+            heuristic,
+            instance.from.0,
+            instance.from.1,
+            instance.to.0,
+            instance.to.1,
+        );
+        println!(
+            "{:?} -> {:?}: {:.2?}",
+            instance.from,
+            instance.to,
+            t.elapsed()
+        );
+        let dst = pool.get_mut(instance.to.0, instance.to.1, &mut owner);
+        let len = owner.ro(dst).g;
+        assert_eq!(
+            (len * 1_000.0).round() as i64,
+            (instance.expected_length * 1_000.0).round() as i64
+        );
+    }
+    eprintln!("Total: {:.2?}", t.elapsed());
 }

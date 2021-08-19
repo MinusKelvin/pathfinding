@@ -1,10 +1,9 @@
 use std::f64::consts::SQRT_2;
 
 use enumset::EnumSetType;
-use qcell::{LCell, LCellOwner};
 
 use crate::weighted_grid::WeightedGrid;
-use crate::SearchNode;
+use crate::{Cell, Owner, SearchNode};
 
 #[derive(Debug, EnumSetType)]
 pub enum Direction {
@@ -25,17 +24,17 @@ pub struct GridEdge {
     pub cost: f64,
 }
 
-pub struct GridPool<'id> {
+pub struct GridPool {
     search_num: usize,
-    grid: WeightedGrid<LCell<'id, SearchNode>>,
+    grid: WeightedGrid<Cell<SearchNode>>,
 }
 
-impl<'id> GridPool<'id> {
+impl GridPool {
     pub fn new(width: i32, height: i32) -> Self {
         GridPool {
             search_num: 0,
             grid: WeightedGrid::new(width, height, |x, y| {
-                LCell::new(SearchNode {
+                Cell::new(SearchNode {
                     search_num: 0,
                     expansions: 0,
                     pqueue_location: 0,
@@ -53,7 +52,7 @@ impl<'id> GridPool<'id> {
         self.search_num += 1;
     }
 
-    pub fn get(&self, x: i32, y: i32, owner: &LCellOwner<'id>) -> Option<&LCell<'id, SearchNode>> {
+    pub fn get(&self, x: i32, y: i32, owner: &Owner) -> Option<&Cell<SearchNode>> {
         let cell = self.grid.get(x, y);
         if owner.ro(cell).search_num == self.search_num {
             Some(cell)
@@ -62,7 +61,7 @@ impl<'id> GridPool<'id> {
         }
     }
 
-    pub fn get_mut(&self, x: i32, y: i32, owner: &mut LCellOwner<'id>) -> &LCell<'id, SearchNode> {
+    pub fn get_mut(&self, x: i32, y: i32, owner: &mut Owner) -> &Cell<SearchNode> {
         let cell = self.grid.get(x, y);
         if owner.ro(cell).search_num == self.search_num {
             cell

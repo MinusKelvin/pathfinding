@@ -1,7 +1,5 @@
-#![cfg_attr(feature = "nightly", feature(type_alias_impl_trait))]
-
 use pqueue::PriorityQueue;
-use qcell::LCellOwner;
+use qcell::{TLCell, TLCellOwner};
 use util::GridPool;
 
 pub mod bitgrid;
@@ -28,9 +26,13 @@ pub struct Edge {
     cost: f64,
 }
 
-pub fn astar<'id>(
-    pool: &mut GridPool<'id>,
-    owner: &mut LCellOwner<'id>,
+pub enum SearchCellMarker {}
+type Cell<T> = TLCell<SearchCellMarker, T>;
+type Owner = TLCellOwner<SearchCellMarker>;
+
+pub fn astar(
+    pool: &mut GridPool,
+    owner: &mut Owner,
     mut expander: impl FnMut(&SearchNode, &mut Vec<Edge>),
     mut h: impl FnMut(i32, i32) -> f64,
     src_x: i32,
