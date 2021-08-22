@@ -3,7 +3,7 @@ use std::f64::consts::SQRT_2;
 use enumset::EnumSetType;
 
 use crate::weighted_grid::WeightedGrid;
-use crate::{Cell, Owner, SearchNode};
+use crate::{Cell, NodePool, Owner, SearchNode};
 
 #[derive(Debug, EnumSetType)]
 pub enum Direction {
@@ -26,7 +26,7 @@ pub struct GridEdge {
 
 pub struct GridPool {
     search_num: usize,
-    grid: WeightedGrid<Cell<SearchNode>>,
+    grid: WeightedGrid<Cell<SearchNode<(i32, i32)>>>,
 }
 
 impl GridPool {
@@ -38,8 +38,7 @@ impl GridPool {
                     search_num: 0,
                     expansions: 0,
                     pqueue_location: 0,
-                    x,
-                    y,
+                    id: (x, y),
                     parent: None,
                     g: 0.0,
                     lb: 0.0,
@@ -48,11 +47,7 @@ impl GridPool {
         }
     }
 
-    pub fn reset(&mut self) {
-        self.search_num += 1;
-    }
-
-    pub fn get(&self, x: i32, y: i32, owner: &Owner) -> Option<&Cell<SearchNode>> {
+    pub fn get(&self, x: i32, y: i32, owner: &Owner) -> Option<&Cell<SearchNode<(i32, i32)>>> {
         let cell = self.grid.get(x, y);
         if owner.ro(cell).search_num == self.search_num {
             Some(cell)
@@ -60,8 +55,14 @@ impl GridPool {
             None
         }
     }
+}
 
-    pub fn get_mut(&self, x: i32, y: i32, owner: &mut Owner) -> &Cell<SearchNode> {
+impl NodePool<(i32, i32)> for GridPool {
+    fn reset(&mut self) {
+        self.search_num += 1;
+    }
+
+    fn get_mut(&self, (x, y): (i32, i32), owner: &mut Owner) -> &Cell<SearchNode<(i32, i32)>> {
         let cell = self.grid.get(x, y);
         if owner.ro(cell).search_num == self.search_num {
             cell
@@ -77,8 +78,8 @@ impl GridPool {
     }
 }
 
-pub fn octile_heuristic((tx, ty): (i32, i32), scale: f64) -> impl Fn(i32, i32) -> f64 {
-    move |x, y| {
+pub fn octile_heuristic((tx, ty): (i32, i32), scale: f64) -> impl Fn((i32, i32)) -> f64 {
+    move |(x, y)| {
         let dx = (tx - x).abs();
         let dy = (ty - y).abs();
         let diagonal_moves = dx.min(dy);
@@ -87,14 +88,14 @@ pub fn octile_heuristic((tx, ty): (i32, i32), scale: f64) -> impl Fn(i32, i32) -
     }
 }
 
-pub fn manhattan_heuristic((tx, ty): (i32, i32), scale: f64) -> impl Fn(i32, i32) -> f64 {
-    move |x, y| {
+pub fn manhattan_heuristic((tx, ty): (i32, i32), scale: f64) -> impl Fn((i32, i32)) -> f64 {
+    move |(x, y)| {
         let dx = (tx - x).abs();
         let dy = (ty - y).abs();
         (dx + dy) as f64 * scale
     }
 }
 
-pub fn zero_heuristic() -> impl Fn(i32, i32) -> f64 {
-    |_, _| 0.0
+pub fn zero_heuristic<VertexId>() -> impl Fn(VertexId) -> f64 {
+    |_| 0.0
 }

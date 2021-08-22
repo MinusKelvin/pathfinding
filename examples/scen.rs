@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use pathfinding::bitgrid::{create_tmap, jps, no_corner_cutting, BitGrid};
 use pathfinding::util::{octile_heuristic, zero_heuristic, GridPool};
-use pathfinding::{astar, Edge, SearchNode};
+use pathfinding::{Edge, NodePool, SearchNode, astar};
 use qcell::TLCellOwner;
 use structopt::StructOpt;
 
@@ -128,8 +128,8 @@ fn run<F, H>(
     height: i32,
     mut init: impl FnMut((i32, i32)) -> (F, H),
 ) where
-    F: FnMut(&SearchNode, &mut Vec<Edge>),
-    H: Fn(i32, i32) -> f64,
+    F: FnMut(&SearchNode<(i32, i32)>, &mut Vec<Edge<(i32, i32)>>),
+    H: Fn((i32, i32)) -> f64,
 {
     let mut owner = TLCellOwner::new();
     let mut pool = GridPool::new(width, height);
@@ -143,10 +143,8 @@ fn run<F, H>(
             &mut owner,
             expander,
             heuristic,
-            instance.from.0,
-            instance.from.1,
-            instance.to.0,
-            instance.to.1,
+            instance.from,
+            instance.to,
         );
         println!(
             "{:?} -> {:?}: {:.2?}",
@@ -154,7 +152,7 @@ fn run<F, H>(
             instance.to,
             t.elapsed()
         );
-        let dst = pool.get_mut(instance.to.0, instance.to.1, &mut owner);
+        let dst = pool.get_mut(instance.to, &mut owner);
         let len = owner.ro(dst).g;
         assert_eq!(
             (len * 1_000.0).round() as i64,

@@ -1,6 +1,5 @@
 use pqueue::PriorityQueue;
 use qcell::{TLCell, TLCellOwner};
-use util::GridPool;
 
 pub mod bitgrid;
 pub mod pqueue;
@@ -8,43 +7,39 @@ pub mod util;
 pub mod weighted_grid;
 
 #[derive(Debug, Copy, Clone)]
-pub struct SearchNode {
+pub struct SearchNode<VertexId> {
     search_num: usize,
     pqueue_location: usize,
     pub expansions: usize,
-    pub x: i32,
-    pub y: i32,
-    pub parent: Option<(i32, i32)>,
+    pub id: VertexId,
+    pub parent: Option<VertexId>,
     pub g: f64,
     pub lb: f64,
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct Edge {
-    to_x: i32,
-    to_y: i32,
-    cost: f64,
+pub struct Edge<VertexId> {
+    pub destination: VertexId,
+    pub cost: f64,
 }
 
 pub enum SearchCellMarker {}
 type Cell<T> = TLCell<SearchCellMarker, T>;
 type Owner = TLCellOwner<SearchCellMarker>;
 
-pub fn astar(
-    pool: &mut GridPool,
+pub fn astar<VertexId>(
+    pool: &mut impl NodePool<VertexId>,
     owner: &mut Owner,
-    mut expander: impl FnMut(&SearchNode, &mut Vec<Edge>),
-    mut h: impl FnMut(i32, i32) -> f64,
-    src_x: i32,
-    src_y: i32,
-    goal_x: i32,
-    goal_y: i32,
-) {
+    mut expander: impl FnMut(&SearchNode<VertexId>, &mut Vec<Edge<VertexId>>),
+    mut h: impl FnMut(VertexId) -> f64,
+    source: VertexId,
+    goal: VertexId,
+) where VertexId: Copy + Eq {
     pool.reset();
     let mut queue = PriorityQueue::new();
     let mut edges = vec![];
 
-    let source = pool.get_mut(src_x, src_y, owner);
+    let source = pool.get_mut(source, owner);
     owner.rw(source).g = 0.0;
     owner.rw(source).lb = 0.0;
 
@@ -53,25 +48,30 @@ pub fn astar(
     while let Some(node) = queue.pop(owner) {
         let n = owner.rw(node);
         n.expansions += 1;
-        if n.x == goal_x && n.y == goal_y {
+        if n.id == goal {
             break;
         }
 
         expander(n, &mut edges);
 
         let parent_g = n.g;
-        let parent_coords = (n.x, n.y);
+        let parent_id = n.id;
 
         for edge in edges.drain(..) {
             let g = parent_g + edge.cost;
-            let node = pool.get_mut(edge.to_x, edge.to_y, owner);
+            let node = pool.get_mut(edge.destination, owner);
             let n = owner.rw(node);
             if g < n.g {
                 n.g = g;
-                n.lb = g + h(n.x, n.y);
-                n.parent = Some(parent_coords);
+                n.lb = g + h(n.id);
+                n.parent = Some(parent_id);
                 queue.decrease_key(node, owner);
             }
         }
     }
+}
+
+pub trait NodePool<VertexId> {
+    fn reset(&mut self);
+    fn get_mut(&self, id: VertexId, owner: &mut Owner) -> &Cell<SearchNode<VertexId>>;
 }

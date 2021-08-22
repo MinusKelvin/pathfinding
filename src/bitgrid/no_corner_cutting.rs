@@ -5,62 +5,56 @@ use crate::{Edge, SearchNode};
 
 use super::BitGrid;
 
-pub fn no_corner_cutting(map: &BitGrid) -> impl Fn(&SearchNode, &mut Vec<Edge>) + '_ {
+pub fn no_corner_cutting(
+    map: &BitGrid,
+) -> impl Fn(&SearchNode<(i32, i32)>, &mut Vec<Edge<(i32, i32)>>) + '_ {
     move |node, edges| {
-        let nbs = map.get_neighbors(node.x, node.y);
+        let nbs = map.get_neighbors(node.id.0, node.id.1);
         if nbs.is_disjoint(Direction::North.into()) {
             edges.push(Edge {
-                to_x: node.x,
-                to_y: node.y - 1,
+                destination: (node.id.0, node.id.1 - 1),
                 cost: 1.0,
             });
         }
         if nbs.is_disjoint(Direction::South.into()) {
             edges.push(Edge {
-                to_x: node.x,
-                to_y: node.y + 1,
+                destination: (node.id.0, node.id.1 + 1),
                 cost: 1.0,
             });
         }
         if nbs.is_disjoint(Direction::West.into()) {
             edges.push(Edge {
-                to_x: node.x - 1,
-                to_y: node.y,
+                destination: (node.id.0 - 1, node.id.1),
                 cost: 1.0,
             });
         }
         if nbs.is_disjoint(Direction::East.into()) {
             edges.push(Edge {
-                to_x: node.x + 1,
-                to_y: node.y,
+                destination: (node.id.0 + 1, node.id.1),
                 cost: 1.0,
             });
         }
         if nbs.is_disjoint(Direction::North | Direction::West | Direction::NorthWest) {
             edges.push(Edge {
-                to_x: node.x - 1,
-                to_y: node.y - 1,
+                destination: (node.id.0 - 1, node.id.1 - 1),
                 cost: SQRT_2,
             });
         }
         if nbs.is_disjoint(Direction::North | Direction::East | Direction::NorthEast) {
             edges.push(Edge {
-                to_x: node.x + 1,
-                to_y: node.y - 1,
+                destination: (node.id.0 + 1, node.id.1 - 1),
                 cost: SQRT_2,
             });
         }
         if nbs.is_disjoint(Direction::South | Direction::West | Direction::SouthWest) {
             edges.push(Edge {
-                to_x: node.x - 1,
-                to_y: node.y + 1,
+                destination: (node.id.0 - 1, node.id.1 + 1),
                 cost: SQRT_2,
             });
         }
         if nbs.is_disjoint(Direction::South | Direction::East | Direction::SouthEast) {
             edges.push(Edge {
-                to_x: node.x + 1,
-                to_y: node.y + 1,
+                destination: (node.id.0 + 1, node.id.1 + 1),
                 cost: SQRT_2,
             });
         }

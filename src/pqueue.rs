@@ -1,15 +1,15 @@
 use crate::{Cell, Owner, SearchNode};
 
-pub struct PriorityQueue<'a> {
-    heap: Vec<&'a Cell<SearchNode>>,
+pub struct PriorityQueue<'a, VertexId> {
+    heap: Vec<&'a Cell<SearchNode<VertexId>>>,
 }
 
-impl<'a> PriorityQueue<'a> {
+impl<'a, VertexId> PriorityQueue<'a, VertexId> {
     pub fn new() -> Self {
         PriorityQueue { heap: vec![] }
     }
 
-    pub fn decrease_key(&mut self, node: &'a Cell<SearchNode>, owner: &mut Owner) {
+    pub fn decrease_key(&mut self, node: &'a Cell<SearchNode<VertexId>>, owner: &mut Owner) {
         if !self.contains(node, owner) {
             let index = self.heap.len();
             self.heap.push(node);
@@ -22,7 +22,7 @@ impl<'a> PriorityQueue<'a> {
         self.heapify_up(index, owner);
     }
 
-    pub fn pop(&mut self, owner: &mut Owner) -> Option<&'a Cell<SearchNode>> {
+    pub fn pop(&mut self, owner: &mut Owner) -> Option<&'a Cell<SearchNode<VertexId>>> {
         match self.heap.len() {
             0 => None,
             1 => self.heap.pop(),
@@ -35,7 +35,7 @@ impl<'a> PriorityQueue<'a> {
         }
     }
 
-    fn contains(&self, node: &'a Cell<SearchNode>, owner: &mut Owner) -> bool {
+    fn contains(&self, node: &'a Cell<SearchNode<VertexId>>, owner: &mut Owner) -> bool {
         self.heap
             .get(owner.ro(node).pqueue_location)
             .map_or(false, |&occupant| std::ptr::eq(node, occupant))

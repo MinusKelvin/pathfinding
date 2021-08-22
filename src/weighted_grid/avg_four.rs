@@ -4,63 +4,57 @@ use crate::{Edge, SearchNode};
 
 use super::{Cost, Neighborhood, WeightedGrid};
 
-pub fn avg_four<T: Cost>(map: &WeightedGrid<T>) -> impl Fn(&SearchNode, &mut Vec<Edge>) + '_ {
+pub fn avg_four<T: Cost>(
+    map: &WeightedGrid<T>,
+) -> impl Fn(&SearchNode<(i32, i32)>, &mut Vec<Edge<(i32, i32)>>) + '_ {
     move |node, edges| {
-        let neighborhood = map.get_neighborhood(node.x, node.y);
+        let neighborhood = map.get_neighborhood(node.id.0, node.id.1);
         let c = neighborhood.c.cost().unwrap();
         if let Some(cost) = neighborhood.n.cost() {
             edges.push(Edge {
-                to_x: node.x,
-                to_y: node.y - 1,
+                destination: (node.id.0, node.id.1 - 1),
                 cost: (cost + c) / 2.0,
             });
         }
         if let Some(cost) = neighborhood.s.cost() {
             edges.push(Edge {
-                to_x: node.x,
-                to_y: node.y + 1,
+                destination: (node.id.0, node.id.1 + 1),
                 cost: (cost + c) / 2.0,
             });
         }
         if let Some(cost) = neighborhood.w.cost() {
             edges.push(Edge {
-                to_x: node.x - 1,
-                to_y: node.y,
+                destination: (node.id.0 - 1, node.id.1),
                 cost: (cost + c) / 2.0,
             });
         }
         if let Some(cost) = neighborhood.e.cost() {
             edges.push(Edge {
-                to_x: node.x + 1,
-                to_y: node.y,
+                destination: (node.id.0 + 1, node.id.1),
                 cost: (cost + c) / 2.0,
             });
         }
         if let Some(cost) = neighborhood.nw_cost() {
             edges.push(Edge {
-                to_x: node.x - 1,
-                to_y: node.y - 1,
+                destination: (node.id.0 - 1, node.id.1 - 1),
                 cost,
             });
         }
         if let Some(cost) = neighborhood.ne_cost() {
             edges.push(Edge {
-                to_x: node.x + 1,
-                to_y: node.y - 1,
+                destination: (node.id.0 + 1, node.id.1 - 1),
                 cost,
             });
         }
         if let Some(cost) = neighborhood.sw_cost() {
             edges.push(Edge {
-                to_x: node.x - 1,
-                to_y: node.y + 1,
+                destination: (node.id.0 - 1, node.id.1 + 1),
                 cost,
             });
         }
         if let Some(cost) = neighborhood.se_cost() {
             edges.push(Edge {
-                to_x: node.x + 1,
-                to_y: node.y + 1,
+                destination: (node.id.0 + 1, node.id.1 + 1),
                 cost,
             });
         }

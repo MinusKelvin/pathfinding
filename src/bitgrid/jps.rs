@@ -21,7 +21,7 @@ pub fn jps<'a>(
     map: &'a BitGrid,
     tmap: &'a BitGrid,
     (goal_x, goal_y): (i32, i32),
-) -> impl Fn(&SearchNode, &mut Vec<Edge>) + 'a {
+) -> impl Fn(&SearchNode<(i32, i32)>, &mut Vec<Edge<(i32, i32)>>) + 'a {
     move |node, edges| {
         expand(map, tmap, goal_x, goal_y, node, edges);
     }
@@ -32,78 +32,70 @@ fn expand(
     tmap: &BitGrid,
     goal_x: i32,
     goal_y: i32,
-    node: &SearchNode,
-    edges: &mut Vec<Edge>,
+    node: &SearchNode<(i32, i32)>,
+    edges: &mut Vec<Edge<(i32, i32)>>,
 ) {
     let successors = canonical_successors(map, node);
     if successors.contains(Direction::East) {
-        if let Ok(d) = jump_plus(map, node.x, node.y, goal_x, goal_y) {
+        if let Ok(d) = jump_plus(map, node.id.0, node.id.1, goal_x, goal_y) {
             edges.push(Edge {
-                to_x: node.x + d,
-                to_y: node.y,
+                destination: (node.id.0 + d, node.id.1),
                 cost: d as f64,
             });
         }
     }
     if successors.contains(Direction::South) {
-        if let Ok(d) = jump_plus(tmap, node.y, node.x, goal_y, goal_x) {
+        if let Ok(d) = jump_plus(tmap, node.id.1, node.id.0, goal_y, goal_x) {
             edges.push(Edge {
-                to_x: node.x,
-                to_y: node.y + d,
+                destination: (node.id.0, node.id.1 + d),
                 cost: d as f64,
             });
         }
     }
     if successors.contains(Direction::West) {
-        if let Ok(d) = jump_minus(map, node.x, node.y, goal_x, goal_y) {
+        if let Ok(d) = jump_minus(map, node.id.0, node.id.1, goal_x, goal_y) {
             edges.push(Edge {
-                to_x: node.x - d,
-                to_y: node.y,
+                destination: (node.id.0 - d, node.id.1),
                 cost: d as f64,
             });
         }
     }
     if successors.contains(Direction::North) {
-        if let Ok(d) = jump_minus(tmap, node.y, node.x, goal_y, goal_x) {
+        if let Ok(d) = jump_minus(tmap, node.id.1, node.id.0, goal_y, goal_x) {
             edges.push(Edge {
-                to_x: node.x,
-                to_y: node.y - d,
+                destination: (node.id.0, node.id.1 - d),
                 cost: d as f64,
             });
         }
     }
     if successors.contains(Direction::NorthWest) {
-        if let Some(d) = jump_northwest(map, tmap, node.x, node.y, goal_x, goal_y) {
+        if let Some(d) = jump_northwest(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
             edges.push(Edge {
-                to_x: node.x - d,
-                to_y: node.y - d,
+                destination: (node.id.0 - d, node.id.1 - d),
                 cost: SQRT_2 * d as f64,
             });
         }
     }
     if successors.contains(Direction::NorthEast) {
-        if let Some(d) = jump_northeast(map, tmap, node.x, node.y, goal_x, goal_y) {
+        if let Some(d) = jump_northeast(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
             edges.push(Edge {
-                to_x: node.x + d,
-                to_y: node.y - d,
+                destination: (node.id.0 + d, node.id.1 - d),
                 cost: SQRT_2 * d as f64,
             });
         }
     }
     if successors.contains(Direction::SouthWest) {
-        if let Some(d) = jump_southwest(map, tmap, node.x, node.y, goal_x, goal_y) {
+        if let Some(d) = jump_southwest(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
             edges.push(Edge {
-                to_x: node.x - d,
-                to_y: node.y + d,
+                destination: (node.id.0 - d, node.id.1 + d),
                 cost: SQRT_2 * d as f64,
             });
         }
     }
     if successors.contains(Direction::SouthEast) {
-        if let Some(d) = jump_southeast(map, tmap, node.x, node.y, goal_x, goal_y) {
+        if let Some(d) = jump_southeast(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
             edges.push(Edge {
-                to_x: node.x + d,
-                to_y: node.y + d,
+                destination: (node.id.0 + d, node.id.1 + d),
                 cost: SQRT_2 * d as f64,
             });
         }
@@ -284,20 +276,20 @@ fn jump_southeast(
     }
 }
 
-fn canonical_successors(map: &BitGrid, node: &SearchNode) -> EnumSet<Direction> {
-    let nbs = map.get_neighbors(node.x, node.y);
-    let dir = node.parent.map(|(px, py)| match node.y.cmp(&py) {
-        std::cmp::Ordering::Less => match node.x.cmp(&px) {
+fn canonical_successors(map: &BitGrid, node: &SearchNode<(i32, i32)>) -> EnumSet<Direction> {
+    let nbs = map.get_neighbors(node.id.0, node.id.1);
+    let dir = node.parent.map(|(px, py)| match node.id.1.cmp(&py) {
+        std::cmp::Ordering::Less => match node.id.0.cmp(&px) {
             std::cmp::Ordering::Less => Direction::NorthWest,
             std::cmp::Ordering::Equal => Direction::North,
             std::cmp::Ordering::Greater => Direction::NorthEast,
         },
-        std::cmp::Ordering::Equal => match node.x.cmp(&px) {
+        std::cmp::Ordering::Equal => match node.id.0.cmp(&px) {
             std::cmp::Ordering::Less => Direction::West,
             std::cmp::Ordering::Equal => unreachable!(),
             std::cmp::Ordering::Greater => Direction::East,
         },
-        std::cmp::Ordering::Greater => match node.x.cmp(&px) {
+        std::cmp::Ordering::Greater => match node.id.0.cmp(&px) {
             std::cmp::Ordering::Less => Direction::SouthWest,
             std::cmp::Ordering::Equal => Direction::South,
             std::cmp::Ordering::Greater => Direction::SouthEast,
