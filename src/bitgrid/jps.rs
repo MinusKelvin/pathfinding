@@ -22,6 +22,10 @@ pub fn jps<'a>(
     tmap: &'a BitGrid,
     goal: (i32, i32),
 ) -> impl ExpansionPolicy<(i32, i32)> + 'a {
+    // SAFETY: While tmap is supposed to be a transposed copy of the map, our safety requirements
+    //         are less strict - tmap need only have transposed width and height.
+    assert_eq!(map.width(), tmap.height());
+    assert_eq!(map.height(), tmap.width());
     JpsExpansionPolicy { map, tmap, goal }
 }
 
@@ -31,16 +35,24 @@ struct JpsExpansionPolicy<'a> {
     goal: (i32, i32),
 }
 
-impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {
-    fn expand(&mut self, node: &SearchNode<(i32, i32)>, edges: &mut Vec<Edge<(i32, i32)>>) {
+impl JpsExpansionPolicy<'_> {
+    /// SAFETY: The caller must ensure that the id of the node is in-bounds of the map for this
+    ///         expansion policy.
+    unsafe fn expand_unchecked(
+        &mut self,
+        node: &SearchNode<(i32, i32)>,
+        edges: &mut Vec<Edge<(i32, i32)>>,
+    ) {
         let &mut JpsExpansionPolicy {
             map,
             tmap,
             goal: (goal_x, goal_y),
         } = self;
-        let successors = canonical_successors(map, node);
+        let successors = canonical_successors(map, node.id, get_direction(node.id, node.parent));
+        // SAFETY: The caller is responsible for upholding the requirement that the node id is
+        //         in-bounds of the map.
         if successors.contains(Direction::East) {
-            if let Ok(d) = jump_plus(map, node.id.0, node.id.1, goal_x, goal_y) {
+            if let Ok(d) = jump_plus_unchecked(map, node.id.0, node.id.1, goal_x, goal_y) {
                 edges.push(Edge {
                     destination: (node.id.0 + d, node.id.1),
                     cost: d as f64,
@@ -48,7 +60,7 @@ impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {
             }
         }
         if successors.contains(Direction::South) {
-            if let Ok(d) = jump_plus(tmap, node.id.1, node.id.0, goal_y, goal_x) {
+            if let Ok(d) = jump_plus_unchecked(tmap, node.id.1, node.id.0, goal_y, goal_x) {
                 edges.push(Edge {
                     destination: (node.id.0, node.id.1 + d),
                     cost: d as f64,
@@ -56,7 +68,7 @@ impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {
             }
         }
         if successors.contains(Direction::West) {
-            if let Ok(d) = jump_minus(map, node.id.0, node.id.1, goal_x, goal_y) {
+            if let Ok(d) = jump_minus_unchecked(map, node.id.0, node.id.1, goal_x, goal_y) {
                 edges.push(Edge {
                     destination: (node.id.0 - d, node.id.1),
                     cost: d as f64,
@@ -64,15 +76,19 @@ impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {
             }
         }
         if successors.contains(Direction::North) {
-            if let Ok(d) = jump_minus(tmap, node.id.1, node.id.0, goal_y, goal_x) {
+            if let Ok(d) = jump_minus_unchecked(tmap, node.id.1, node.id.0, goal_y, goal_x) {
                 edges.push(Edge {
                     destination: (node.id.0, node.id.1 - d),
                     cost: d as f64,
                 });
             }
         }
+        // SAFETY: During construction of self, we check that tmap's dimensions are the transpose
+        //         of map's dimension.
         if successors.contains(Direction::NorthWest) {
-            if let Some(d) = jump_northwest(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
+            if let Some(d) =
+                jump_northwest_unchecked(map, tmap, node.id.0, node.id.1, goal_x, goal_y)
+            {
                 edges.push(Edge {
                     destination: (node.id.0 - d, node.id.1 - d),
                     cost: SQRT_2 * d as f64,
@@ -80,7 +96,9 @@ impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {
             }
         }
         if successors.contains(Direction::NorthEast) {
-            if let Some(d) = jump_northeast(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
+            if let Some(d) =
+                jump_northeast_unchecked(map, tmap, node.id.0, node.id.1, goal_x, goal_y)
+            {
                 edges.push(Edge {
                     destination: (node.id.0 + d, node.id.1 - d),
                     cost: SQRT_2 * d as f64,
@@ -88,7 +106,9 @@ impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {
             }
         }
         if successors.contains(Direction::SouthWest) {
-            if let Some(d) = jump_southwest(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
+            if let Some(d) =
+                jump_southwest_unchecked(map, tmap, node.id.0, node.id.1, goal_x, goal_y)
+            {
                 edges.push(Edge {
                     destination: (node.id.0 - d, node.id.1 + d),
                     cost: SQRT_2 * d as f64,
@@ -96,7 +116,9 @@ impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {
             }
         }
         if successors.contains(Direction::SouthEast) {
-            if let Some(d) = jump_southeast(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
+            if let Some(d) =
+                jump_southeast_unchecked(map, tmap, node.id.0, node.id.1, goal_x, goal_y)
+            {
                 edges.push(Edge {
                     destination: (node.id.0 + d, node.id.1 + d),
                     cost: SQRT_2 * d as f64,
@@ -106,13 +128,34 @@ impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {
     }
 }
 
+impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {
+    fn expand(&mut self, node: &SearchNode<(i32, i32)>, edges: &mut Vec<Edge<(i32, i32)>>) {
+        self.map.get_neighbors(node.id.0, node.id.1);
+        unsafe {
+            // SAFETY: The above get_neighbors call does the relevant bounds check for us.
+            self.expand_unchecked(node, edges)
+        }
+    }
+}
+
+/// SAFETY: x and y must be in-bounds of the map.
 #[inline(always)]
-fn jump_plus(map: &BitGrid, x: i32, y: i32, goal_x: i32, goal_y: i32) -> Result<i32, bool> {
+unsafe fn jump_plus_unchecked(
+    map: &BitGrid,
+    x: i32,
+    y: i32,
+    goal_x: i32,
+    goal_y: i32,
+) -> Result<i32, bool> {
     let mut distance = 0;
     loop {
-        let bits_above = map.get_row(x + distance, y - 1);
-        let bits = map.get_row(x + distance, y);
-        let bits_below = map.get_row(x + distance, y + 1);
+        // SAFETY: Since y is in-bounds of the map and get_row_unchecked has 1 cell padding, the
+        //         y parameter is in-bounds.
+        // SAFETY: Since we stop jumping when we see the first 1 bit and the map is padded with 1s,
+        //         x + distance will never go off the right side of the map and will be in-bounds.
+        let bits_above = map.get_row_unchecked(x + distance, y - 1);
+        let bits = map.get_row_unchecked(x + distance, y);
+        let bits_below = map.get_row_unchecked(x + distance, y + 1);
 
         let forced_above = (bits_above << 1) & !bits_above;
         let forced_below = (bits_below << 1) & !bits_below;
@@ -137,13 +180,24 @@ fn jump_plus(map: &BitGrid, x: i32, y: i32, goal_x: i32, goal_y: i32) -> Result<
     }
 }
 
+/// SAFETY: x and y must be in-bounds of the map.
 #[inline(always)]
-fn jump_minus(map: &BitGrid, x: i32, y: i32, goal_x: i32, goal_y: i32) -> Result<i32, bool> {
+unsafe fn jump_minus_unchecked(
+    map: &BitGrid,
+    x: i32,
+    y: i32,
+    goal_x: i32,
+    goal_y: i32,
+) -> Result<i32, bool> {
     let mut distance = 0;
     loop {
-        let bits_above = map.get_row_upper(x - distance, y - 1);
-        let bits = map.get_row_upper(x - distance, y);
-        let bits_below = map.get_row_upper(x - distance, y + 1);
+        // SAFETY: Since y is in-bounds of the map and get_row_upper_unchecked has 1 cell padding,
+        //         the y parameter is in-bounds.
+        // SAFETY: Since we stop jumping when we see the first 1 bit and the map is padded with 1s,
+        //         x - distance will never go off the left side of the map and will be in-bounds.
+        let bits_above = map.get_row_upper_unchecked(x - distance, y - 1);
+        let bits = map.get_row_upper_unchecked(x - distance, y);
+        let bits_below = map.get_row_upper_unchecked(x - distance, y + 1);
 
         let forced_above = (bits_above >> 1) & !bits_above;
         let forced_below = (bits_below >> 1) & !bits_below;
@@ -168,8 +222,9 @@ fn jump_minus(map: &BitGrid, x: i32, y: i32, goal_x: i32, goal_y: i32) -> Result
     }
 }
 
+/// SAFETY: x and y must be in-bounds of the map, and tmap's dimensions must be transpose of map.
 #[inline(always)]
-fn jump_northwest(
+unsafe fn jump_northwest_unchecked(
     map: &BitGrid,
     tmap: &BitGrid,
     x: i32,
@@ -182,11 +237,14 @@ fn jump_northwest(
         distance += 1;
 
         let mut done = false;
-        match jump_minus(map, x - distance, y - distance, goal_x, goal_y) {
+        // SAFETY: Since x and y are in-bounds of the map and we stop when we get to an obstruction
+        //         (e.g. the padding 1s around the map), x - distance and y - distance will always
+        //         be in-bounds.
+        match jump_minus_unchecked(map, x - distance, y - distance, goal_x, goal_y) {
             Ok(_) => return Some(distance),
             Err(d) => done |= d,
         }
-        match jump_minus(tmap, y - distance, x - distance, goal_y, goal_x) {
+        match jump_minus_unchecked(tmap, y - distance, x - distance, goal_y, goal_x) {
             Ok(_) => return Some(distance),
             Err(d) => done |= d,
         }
@@ -196,8 +254,9 @@ fn jump_northwest(
     }
 }
 
+/// SAFETY: x and y must be in-bounds of the map, and tmap's dimensions must be transpose of map.
 #[inline(always)]
-fn jump_northeast(
+unsafe fn jump_northeast_unchecked(
     map: &BitGrid,
     tmap: &BitGrid,
     x: i32,
@@ -210,11 +269,14 @@ fn jump_northeast(
         distance += 1;
 
         let mut done = false;
-        match jump_plus(map, x + distance, y - distance, goal_x, goal_y) {
+        // SAFETY: Since x and y are in-bounds of the map and we stop when we get to an obstruction
+        //         (e.g. the padding 1s around the map), x + distance and y - distance will always
+        //         be in-bounds.
+        match jump_plus_unchecked(map, x + distance, y - distance, goal_x, goal_y) {
             Ok(_) => return Some(distance),
             Err(d) => done |= d,
         }
-        match jump_minus(tmap, y - distance, x + distance, goal_y, goal_x) {
+        match jump_minus_unchecked(tmap, y - distance, x + distance, goal_y, goal_x) {
             Ok(_) => return Some(distance),
             Err(d) => done |= d,
         }
@@ -224,8 +286,9 @@ fn jump_northeast(
     }
 }
 
+/// SAFETY: x and y must be in-bounds of the map, and tmap's dimensions must be transpose of map.
 #[inline(always)]
-fn jump_southwest(
+unsafe fn jump_southwest_unchecked(
     map: &BitGrid,
     tmap: &BitGrid,
     x: i32,
@@ -238,11 +301,14 @@ fn jump_southwest(
         distance += 1;
 
         let mut done = false;
-        match jump_minus(map, x - distance, y + distance, goal_x, goal_y) {
+        // SAFETY: Since x and y are in-bounds of the map and we stop when we get to an obstruction
+        //         (e.g. the padding 1s around the map), x - distance and y + distance will always
+        //         be in-bounds.
+        match jump_minus_unchecked(map, x - distance, y + distance, goal_x, goal_y) {
             Ok(_) => return Some(distance),
             Err(d) => done |= d,
         }
-        match jump_plus(tmap, y + distance, x - distance, goal_y, goal_x) {
+        match jump_plus_unchecked(tmap, y + distance, x - distance, goal_y, goal_x) {
             Ok(_) => return Some(distance),
             Err(d) => done |= d,
         }
@@ -252,8 +318,9 @@ fn jump_southwest(
     }
 }
 
+/// SAFETY: x and y must be in-bounds of the map, and tmap's dimensions must be transpose of map.
 #[inline(always)]
-fn jump_southeast(
+unsafe fn jump_southeast_unchecked(
     map: &BitGrid,
     tmap: &BitGrid,
     x: i32,
@@ -266,11 +333,14 @@ fn jump_southeast(
         distance += 1;
 
         let mut done = false;
-        match jump_plus(map, x + distance, y + distance, goal_x, goal_y) {
+        // SAFETY: Since x and y are in-bounds of the map and we stop when we get to an obstruction
+        //         (e.g. the padding 1s around the map), x + distance and y + distance will always
+        //         be in-bounds.
+        match jump_plus_unchecked(map, x + distance, y + distance, goal_x, goal_y) {
             Ok(_) => return Some(distance),
             Err(d) => done |= d,
         }
-        match jump_plus(tmap, y + distance, x + distance, goal_y, goal_x) {
+        match jump_plus_unchecked(tmap, y + distance, x + distance, goal_y, goal_x) {
             Ok(_) => return Some(distance),
             Err(d) => done |= d,
         }
@@ -280,25 +350,32 @@ fn jump_southeast(
     }
 }
 
-fn canonical_successors(map: &BitGrid, node: &SearchNode<(i32, i32)>) -> EnumSet<Direction> {
-    let nbs = map.get_neighbors(node.id.0, node.id.1);
-    let dir = node.parent.map(|(px, py)| match node.id.1.cmp(&py) {
-        std::cmp::Ordering::Less => match node.id.0.cmp(&px) {
+fn get_direction((x, y): (i32, i32), parent: Option<(i32, i32)>) -> Option<Direction> {
+    parent.map(|(px, py)| match y.cmp(&py) {
+        std::cmp::Ordering::Less => match x.cmp(&px) {
             std::cmp::Ordering::Less => Direction::NorthWest,
             std::cmp::Ordering::Equal => Direction::North,
             std::cmp::Ordering::Greater => Direction::NorthEast,
         },
-        std::cmp::Ordering::Equal => match node.id.0.cmp(&px) {
+        std::cmp::Ordering::Equal => match x.cmp(&px) {
             std::cmp::Ordering::Less => Direction::West,
             std::cmp::Ordering::Equal => unreachable!(),
             std::cmp::Ordering::Greater => Direction::East,
         },
-        std::cmp::Ordering::Greater => match node.id.0.cmp(&px) {
+        std::cmp::Ordering::Greater => match x.cmp(&px) {
             std::cmp::Ordering::Less => Direction::SouthWest,
             std::cmp::Ordering::Equal => Direction::South,
             std::cmp::Ordering::Greater => Direction::SouthEast,
         },
-    });
+    })
+}
+
+fn canonical_successors(
+    map: &BitGrid,
+    (x, y): (i32, i32),
+    dir: Option<Direction>,
+) -> EnumSet<Direction> {
+    let nbs = map.get_neighbors(x, y);
     let mut canonical_successors = EnumSet::empty();
     match dir {
         None => {
