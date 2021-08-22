@@ -70,6 +70,7 @@ impl<'a> PriorityQueue<'a> {
     }
 
     fn heapify_down(&mut self, mut i: usize, owner: &mut Owner) {
+        assert!(i < self.heap.len());
         loop {
             let c1 = i * 2 + 1;
             if c1 >= self.heap.len() {
@@ -77,12 +78,23 @@ impl<'a> PriorityQueue<'a> {
             }
             let c2 = c1 + 1;
 
-            let smaller_child = if c2 >= self.heap.len() || self.le(c1, c2, owner) {
+            // no, seriously, using || was causing bad codegen without the bounds checks
+            let smaller_child = if c2 >= self.heap.len() {
+                c1
+            } else if self.le(c1, c2, owner) {
                 c1
             } else {
                 c2
             };
 
+            if i >= self.heap.len() || smaller_child >= self.heap.len() {
+                // SAFETY: We check that c1 is in-bounds. If c2 is not in-bounds, then smaller_child
+                //         is chosen to be c1, otherwise in either case smaller_child is in-bounds.
+                //         On the first iteration, the assert checks that i is in-bounds. On
+                //         subsequent iterations, i inherits being in-bounds from smaller_child.
+                // Hence, this point can never be reached.
+                unsafe { std::hint::unreachable_unchecked() }
+            }
             if self.le(i, smaller_child, owner) {
                 break;
             }
