@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use pathfinding::bitgrid::{create_tmap, jps, no_corner_cutting, BitGrid};
 use pathfinding::util::{octile_heuristic, zero_heuristic, GridPool};
-use pathfinding::{Edge, NodePool, SearchNode, astar};
+use pathfinding::{ExpansionPolicy, NodePool, astar};
 use qcell::TLCellOwner;
 use structopt::StructOpt;
 
@@ -122,13 +122,13 @@ fn read_map(path: &Path) -> BitGrid {
     grid
 }
 
-fn run<F, H>(
+fn run<E, H>(
     instances: &[Instance],
     width: i32,
     height: i32,
-    mut init: impl FnMut((i32, i32)) -> (F, H),
+    mut init: impl FnMut((i32, i32)) -> (E, H),
 ) where
-    F: FnMut(&SearchNode<(i32, i32)>, &mut Vec<Edge<(i32, i32)>>),
+    E: ExpansionPolicy<(i32, i32)>,
     H: Fn((i32, i32)) -> f64,
 {
     let mut owner = TLCellOwner::new();
@@ -136,12 +136,12 @@ fn run<F, H>(
 
     let t = std::time::Instant::now();
     for instance in instances {
-        let (expander, heuristic) = init(instance.to);
+        let (mut expander, heuristic) = init(instance.to);
         let t = std::time::Instant::now();
         astar(
             &mut pool,
             &mut owner,
-            expander,
+            &mut expander,
             heuristic,
             instance.from,
             instance.to,

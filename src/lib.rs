@@ -30,7 +30,7 @@ type Owner = TLCellOwner<SearchCellMarker>;
 pub fn astar<VertexId>(
     pool: &mut impl NodePool<VertexId>,
     owner: &mut Owner,
-    mut expander: impl FnMut(&SearchNode<VertexId>, &mut Vec<Edge<VertexId>>),
+    expansion_policy: &mut impl ExpansionPolicy<VertexId>,
     mut h: impl FnMut(VertexId) -> f64,
     source: VertexId,
     goal: VertexId,
@@ -52,7 +52,7 @@ pub fn astar<VertexId>(
             break;
         }
 
-        expander(n, &mut edges);
+        expansion_policy.expand(n, &mut edges);
 
         let parent_g = n.g;
         let parent_id = n.id;
@@ -74,4 +74,8 @@ pub fn astar<VertexId>(
 pub trait NodePool<VertexId> {
     fn reset(&mut self);
     fn get_mut(&self, id: VertexId, owner: &mut Owner) -> &Cell<SearchNode<VertexId>>;
+}
+
+pub trait ExpansionPolicy<VertexId> {
+    fn expand(&mut self, node: &SearchNode<VertexId>, edges: &mut Vec<Edge<VertexId>>);
 }

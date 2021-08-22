@@ -1,14 +1,19 @@
 use std::f64::consts::SQRT_2;
 
 use crate::util::Direction;
-use crate::{Edge, SearchNode};
+use crate::{Edge, ExpansionPolicy, SearchNode};
 
 use super::BitGrid;
 
-pub fn no_corner_cutting(
-    map: &BitGrid,
-) -> impl Fn(&SearchNode<(i32, i32)>, &mut Vec<Edge<(i32, i32)>>) + '_ {
-    move |node, edges| {
+pub fn no_corner_cutting(map: &BitGrid) -> impl ExpansionPolicy<(i32, i32)> + '_ {
+    NoCornerCutting(map)
+}
+
+struct NoCornerCutting<'a>(&'a BitGrid);
+
+impl ExpansionPolicy<(i32, i32)> for NoCornerCutting<'_> {
+    fn expand(&mut self, node: &SearchNode<(i32, i32)>, edges: &mut Vec<Edge<(i32, i32)>>) {
+        let &mut Self(map) = self;
         let nbs = map.get_neighbors(node.id.0, node.id.1);
         if nbs.is_disjoint(Direction::North.into()) {
             edges.push(Edge {

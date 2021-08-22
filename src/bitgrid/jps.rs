@@ -3,7 +3,7 @@ use std::f64::consts::SQRT_2;
 use enumset::EnumSet;
 
 use crate::util::Direction;
-use crate::{Edge, SearchNode};
+use crate::{Edge, ExpansionPolicy, SearchNode};
 
 use super::BitGrid;
 
@@ -20,84 +20,88 @@ pub fn create_tmap(map: &BitGrid) -> BitGrid {
 pub fn jps<'a>(
     map: &'a BitGrid,
     tmap: &'a BitGrid,
-    (goal_x, goal_y): (i32, i32),
-) -> impl Fn(&SearchNode<(i32, i32)>, &mut Vec<Edge<(i32, i32)>>) + 'a {
-    move |node, edges| {
-        expand(map, tmap, goal_x, goal_y, node, edges);
-    }
+    goal: (i32, i32),
+) -> impl ExpansionPolicy<(i32, i32)> + 'a {
+    JpsExpansionPolicy { map, tmap, goal }
 }
 
-fn expand(
-    map: &BitGrid,
-    tmap: &BitGrid,
-    goal_x: i32,
-    goal_y: i32,
-    node: &SearchNode<(i32, i32)>,
-    edges: &mut Vec<Edge<(i32, i32)>>,
-) {
-    let successors = canonical_successors(map, node);
-    if successors.contains(Direction::East) {
-        if let Ok(d) = jump_plus(map, node.id.0, node.id.1, goal_x, goal_y) {
-            edges.push(Edge {
-                destination: (node.id.0 + d, node.id.1),
-                cost: d as f64,
-            });
+struct JpsExpansionPolicy<'a> {
+    map: &'a BitGrid,
+    tmap: &'a BitGrid,
+    goal: (i32, i32),
+}
+
+impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {
+    fn expand(&mut self, node: &SearchNode<(i32, i32)>, edges: &mut Vec<Edge<(i32, i32)>>) {
+        let &mut JpsExpansionPolicy {
+            map,
+            tmap,
+            goal: (goal_x, goal_y),
+        } = self;
+        let successors = canonical_successors(map, node);
+        if successors.contains(Direction::East) {
+            if let Ok(d) = jump_plus(map, node.id.0, node.id.1, goal_x, goal_y) {
+                edges.push(Edge {
+                    destination: (node.id.0 + d, node.id.1),
+                    cost: d as f64,
+                });
+            }
         }
-    }
-    if successors.contains(Direction::South) {
-        if let Ok(d) = jump_plus(tmap, node.id.1, node.id.0, goal_y, goal_x) {
-            edges.push(Edge {
-                destination: (node.id.0, node.id.1 + d),
-                cost: d as f64,
-            });
+        if successors.contains(Direction::South) {
+            if let Ok(d) = jump_plus(tmap, node.id.1, node.id.0, goal_y, goal_x) {
+                edges.push(Edge {
+                    destination: (node.id.0, node.id.1 + d),
+                    cost: d as f64,
+                });
+            }
         }
-    }
-    if successors.contains(Direction::West) {
-        if let Ok(d) = jump_minus(map, node.id.0, node.id.1, goal_x, goal_y) {
-            edges.push(Edge {
-                destination: (node.id.0 - d, node.id.1),
-                cost: d as f64,
-            });
+        if successors.contains(Direction::West) {
+            if let Ok(d) = jump_minus(map, node.id.0, node.id.1, goal_x, goal_y) {
+                edges.push(Edge {
+                    destination: (node.id.0 - d, node.id.1),
+                    cost: d as f64,
+                });
+            }
         }
-    }
-    if successors.contains(Direction::North) {
-        if let Ok(d) = jump_minus(tmap, node.id.1, node.id.0, goal_y, goal_x) {
-            edges.push(Edge {
-                destination: (node.id.0, node.id.1 - d),
-                cost: d as f64,
-            });
+        if successors.contains(Direction::North) {
+            if let Ok(d) = jump_minus(tmap, node.id.1, node.id.0, goal_y, goal_x) {
+                edges.push(Edge {
+                    destination: (node.id.0, node.id.1 - d),
+                    cost: d as f64,
+                });
+            }
         }
-    }
-    if successors.contains(Direction::NorthWest) {
-        if let Some(d) = jump_northwest(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
-            edges.push(Edge {
-                destination: (node.id.0 - d, node.id.1 - d),
-                cost: SQRT_2 * d as f64,
-            });
+        if successors.contains(Direction::NorthWest) {
+            if let Some(d) = jump_northwest(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
+                edges.push(Edge {
+                    destination: (node.id.0 - d, node.id.1 - d),
+                    cost: SQRT_2 * d as f64,
+                });
+            }
         }
-    }
-    if successors.contains(Direction::NorthEast) {
-        if let Some(d) = jump_northeast(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
-            edges.push(Edge {
-                destination: (node.id.0 + d, node.id.1 - d),
-                cost: SQRT_2 * d as f64,
-            });
+        if successors.contains(Direction::NorthEast) {
+            if let Some(d) = jump_northeast(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
+                edges.push(Edge {
+                    destination: (node.id.0 + d, node.id.1 - d),
+                    cost: SQRT_2 * d as f64,
+                });
+            }
         }
-    }
-    if successors.contains(Direction::SouthWest) {
-        if let Some(d) = jump_southwest(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
-            edges.push(Edge {
-                destination: (node.id.0 - d, node.id.1 + d),
-                cost: SQRT_2 * d as f64,
-            });
+        if successors.contains(Direction::SouthWest) {
+            if let Some(d) = jump_southwest(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
+                edges.push(Edge {
+                    destination: (node.id.0 - d, node.id.1 + d),
+                    cost: SQRT_2 * d as f64,
+                });
+            }
         }
-    }
-    if successors.contains(Direction::SouthEast) {
-        if let Some(d) = jump_southeast(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
-            edges.push(Edge {
-                destination: (node.id.0 + d, node.id.1 + d),
-                cost: SQRT_2 * d as f64,
-            });
+        if successors.contains(Direction::SouthEast) {
+            if let Some(d) = jump_southeast(map, tmap, node.id.0, node.id.1, goal_x, goal_y) {
+                edges.push(Edge {
+                    destination: (node.id.0 + d, node.id.1 + d),
+                    cost: SQRT_2 * d as f64,
+                });
+            }
         }
     }
 }
