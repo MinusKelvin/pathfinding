@@ -12,8 +12,20 @@ struct AverageOfFour<'a, T: Cost>(&'a WeightedGrid<T>);
 
 impl<T: Cost> ExpansionPolicy<(i32, i32)> for AverageOfFour<'_, T> {
     fn expand(&mut self, node: &SearchNode<(i32, i32)>, edges: &mut Vec<Edge<(i32, i32)>>) {
+        self.0.get_neighborhood(node.id.0, node.id.1);
+        unsafe {
+            // SAFETY: bounds are checked by above call
+            self.expand_unchecked(node, edges)
+        }
+    }
+
+    unsafe fn expand_unchecked(
+        &mut self,
+        node: &SearchNode<(i32, i32)>,
+        edges: &mut Vec<Edge<(i32, i32)>>,
+    ) {
         let &mut AverageOfFour(map) = self;
-        let neighborhood = map.get_neighborhood(node.id.0, node.id.1);
+        let neighborhood = map.get_neighborhood_unchecked(node.id.0, node.id.1);
         let c = neighborhood.c.cost().unwrap();
         if let Some(cost) = neighborhood.n.cost() {
             edges.push(Edge {

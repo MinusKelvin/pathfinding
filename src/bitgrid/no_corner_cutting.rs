@@ -13,8 +13,20 @@ struct NoCornerCutting<'a>(&'a BitGrid);
 
 impl ExpansionPolicy<(i32, i32)> for NoCornerCutting<'_> {
     fn expand(&mut self, node: &SearchNode<(i32, i32)>, edges: &mut Vec<Edge<(i32, i32)>>) {
+        self.0.get_neighbors(node.id.0, node.id.1);
+        unsafe {
+            // SAFETY: Bounds checked by above call
+            self.expand_unchecked(node, edges)
+        }
+    }
+
+    unsafe fn expand_unchecked(
+        &mut self,
+        node: &SearchNode<(i32, i32)>,
+        edges: &mut Vec<Edge<(i32, i32)>>,
+    ) {
         let &mut Self(map) = self;
-        let nbs = map.get_neighbors(node.id.0, node.id.1);
+        let nbs = map.get_neighbors_unchecked(node.id.0, node.id.1);
         if nbs.is_disjoint(Direction::North.into()) {
             edges.push(Edge {
                 destination: (node.id.0, node.id.1 - 1),

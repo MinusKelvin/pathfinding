@@ -62,8 +62,20 @@ impl NodePool<(i32, i32)> for GridPool {
         self.search_num += 1;
     }
 
-    fn get_mut(&self, (x, y): (i32, i32), owner: &mut Owner) -> &Cell<SearchNode<(i32, i32)>> {
-        let cell = self.grid.get(x, y);
+    fn generate(&self, (x, y): (i32, i32), owner: &mut Owner) -> &Cell<SearchNode<(i32, i32)>> {
+        self.grid.get(x, y);
+        unsafe {
+            // SAFETY: Bounds checked above.
+            self.generate_unchecked((x, y), owner)
+        }
+    }
+
+    unsafe fn generate_unchecked(
+        &self,
+        (x, y): (i32, i32),
+        owner: &mut Owner,
+    ) -> &Cell<SearchNode<(i32, i32)>> {
+        let cell = self.grid.get_unchecked(x, y);
         if owner.ro(cell).search_num == self.search_num {
             cell
         } else {

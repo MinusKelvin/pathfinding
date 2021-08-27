@@ -35,9 +35,7 @@ struct JpsExpansionPolicy<'a> {
     goal: (i32, i32),
 }
 
-impl JpsExpansionPolicy<'_> {
-    /// SAFETY: The caller must ensure that the id of the node is in-bounds of the map for this
-    ///         expansion policy.
+impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {
     unsafe fn expand_unchecked(
         &mut self,
         node: &SearchNode<(i32, i32)>,
@@ -126,9 +124,7 @@ impl JpsExpansionPolicy<'_> {
             }
         }
     }
-}
 
-impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {
     fn expand(&mut self, node: &SearchNode<(i32, i32)>, edges: &mut Vec<Edge<(i32, i32)>>) {
         self.map.get_neighbors(node.id.0, node.id.1);
         unsafe {

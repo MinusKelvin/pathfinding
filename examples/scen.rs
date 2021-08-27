@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use pathfinding::bitgrid::{create_tmap, jps, no_corner_cutting, BitGrid};
 use pathfinding::util::{octile_heuristic, zero_heuristic, GridPool};
-use pathfinding::{ExpansionPolicy, NodePool, astar};
+use pathfinding::{astar_unchecked, ExpansionPolicy, NodePool};
 use qcell::TLCellOwner;
 use structopt::StructOpt;
 
@@ -138,21 +138,24 @@ fn run<E, H>(
     for instance in instances {
         let (mut expander, heuristic) = init(instance.to);
         let t = std::time::Instant::now();
-        astar(
-            &mut pool,
-            &mut owner,
-            &mut expander,
-            heuristic,
-            instance.from,
-            instance.to,
-        );
+        unsafe {
+            // definitely not safe
+            astar_unchecked(
+                &mut pool,
+                &mut owner,
+                &mut expander,
+                heuristic,
+                instance.from,
+                instance.to,
+            );
+        }
         println!(
             "{:?} -> {:?}: {:.2?}",
             instance.from,
             instance.to,
             t.elapsed()
         );
-        let dst = pool.get_mut(instance.to, &mut owner);
+        let dst = pool.generate(instance.to, &mut owner);
         let len = owner.ro(dst).g;
         assert_eq!(
             (len * 1_000.0).round() as i64,
