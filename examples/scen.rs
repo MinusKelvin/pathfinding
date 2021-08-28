@@ -149,7 +149,7 @@ fn run<E, H>(
                 instance.to,
             );
         }
-        println!(
+        eprintln!(
             "{:?} -> {:?}: {:.2?}",
             instance.from,
             instance.to,
@@ -162,5 +162,5 @@ fn run<E, H>(
             (instance.expected_length * 1_000.0).round() as i64
         );
     }
-    eprintln!("Total: {:.2?}", t.elapsed());
+    println!("Total: {}", t.elapsed().as_secs_f64());
 }
