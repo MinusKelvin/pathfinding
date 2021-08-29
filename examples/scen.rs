@@ -1,10 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use pathfinding::bitgrid::{create_tmap, jps, no_corner_cutting, BitGrid};
-use pathfinding::util::{octile_heuristic, zero_heuristic, GridPool};
-use pathfinding::{astar_unchecked, ExpansionPolicy, NodePool};
-use qcell::TLCellOwner;
+use pathfinding::domains::BitGrid;
+use pathfinding::expansion_policy::bitgrid::jps::{create_tmap, JpsExpansionPolicy};
+use pathfinding::expansion_policy::bitgrid::no_corner_cutting::NoCornerCutting;
+use pathfinding::expansion_policy::ExpansionPolicy;
+use pathfinding::node_pool::{GridPool, NodePool};
+use pathfinding::util::{octile_heuristic, zero_heuristic};
+use pathfinding::Owner;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -42,20 +45,23 @@ pub fn main() {
         Algorithm::Dijkstra => {
             let map = read_map(&options.map);
             run(&instances, map.width(), map.height(), |_| {
-                (no_corner_cutting(&map), zero_heuristic())
+                (NoCornerCutting::new(&map), zero_heuristic())
             });
         }
         Algorithm::AStar => {
             let map = read_map(&options.map);
             run(&instances, map.width(), map.height(), |goal| {
-                (no_corner_cutting(&map), octile_heuristic(goal, 1.0))
+                (NoCornerCutting::new(&map), octile_heuristic(goal, 1.0))
             });
         }
         Algorithm::Jps => {
             let map = read_map(&options.map);
             let tmap = create_tmap(&map);
             run(&instances, map.width(), map.height(), |goal| {
-                (jps(&map, &tmap, goal), octile_heuristic(goal, 1.0))
+                (
+                    JpsExpansionPolicy::new(&map, &tmap, goal),
+                    octile_heuristic(goal, 1.0),
+                )
             });
         }
     }
@@ -131,7 +137,7 @@ fn run<E, H>(
     E: ExpansionPolicy<(i32, i32)>,
     H: Fn((i32, i32)) -> f64,
 {
-    let mut owner = TLCellOwner::new();
+    let mut owner = Owner::new();
     let mut pool = GridPool::new(width, height);
 
     let t = std::time::Instant::now();
@@ -140,7 +146,7 @@ fn run<E, H>(
         let t = std::time::Instant::now();
         unsafe {
             // definitely not safe
-            astar_unchecked(
+            pathfinding::astar_unchecked(
                 &mut pool,
                 &mut owner,
                 &mut expander,

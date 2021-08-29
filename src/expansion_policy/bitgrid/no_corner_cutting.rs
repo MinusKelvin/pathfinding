@@ -2,14 +2,15 @@ use std::f64::consts::SQRT_2;
 
 use crate::util::Direction;
 use crate::{Edge, ExpansionPolicy, SearchNode};
+use crate::domains::BitGrid;
 
-use super::BitGrid;
+pub struct NoCornerCutting<'a>(&'a BitGrid);
 
-pub fn no_corner_cutting(map: &BitGrid) -> impl ExpansionPolicy<(i32, i32)> + '_ {
-    NoCornerCutting(map)
+impl NoCornerCutting<'_> {
+    pub fn new(map: &BitGrid) -> NoCornerCutting {
+        NoCornerCutting(map)
+    }
 }
-
-struct NoCornerCutting<'a>(&'a BitGrid);
 
 impl ExpansionPolicy<(i32, i32)> for NoCornerCutting<'_> {
     fn expand(&mut self, node: &SearchNode<(i32, i32)>, edges: &mut Vec<Edge<(i32, i32)>>) {

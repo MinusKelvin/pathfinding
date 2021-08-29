@@ -4,8 +4,7 @@ use enumset::EnumSet;
 
 use crate::util::Direction;
 use crate::{Edge, ExpansionPolicy, SearchNode};
-
-use super::BitGrid;
+use crate::domains::BitGrid;
 
 pub fn create_tmap(map: &BitGrid) -> BitGrid {
     let mut tmap = BitGrid::new(map.height(), map.width());
@@ -17,22 +16,20 @@ pub fn create_tmap(map: &BitGrid) -> BitGrid {
     tmap
 }
 
-pub fn jps<'a>(
+pub struct JpsExpansionPolicy<'a> {
     map: &'a BitGrid,
     tmap: &'a BitGrid,
     goal: (i32, i32),
-) -> impl ExpansionPolicy<(i32, i32)> + 'a {
-    // SAFETY: While tmap is supposed to be a transposed copy of the map, our safety requirements
-    //         are less strict - tmap need only have transposed width and height.
-    assert_eq!(map.width(), tmap.height());
-    assert_eq!(map.height(), tmap.width());
-    JpsExpansionPolicy { map, tmap, goal }
 }
 
-struct JpsExpansionPolicy<'a> {
-    map: &'a BitGrid,
-    tmap: &'a BitGrid,
-    goal: (i32, i32),
+impl<'a> JpsExpansionPolicy<'a> {
+    pub fn new(map: &'a BitGrid, tmap: &'a BitGrid, goal: (i32, i32)) -> Self {
+        // SAFETY: While tmap is supposed to be a transposed copy of the map, our safety requirements
+        //         are less strict - tmap need only have transposed width and height.
+        assert_eq!(map.width(), tmap.height());
+        assert_eq!(map.height(), tmap.width());
+        JpsExpansionPolicy { map, tmap, goal }
+    }
 }
 
 impl ExpansionPolicy<(i32, i32)> for JpsExpansionPolicy<'_> {

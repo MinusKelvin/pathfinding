@@ -1,14 +1,16 @@
 use std::f64::consts::SQRT_2;
 
+use crate::domains::WeightedGrid;
+use crate::util::{Cost, Neighborhood};
 use crate::{Edge, ExpansionPolicy, SearchNode};
 
-use super::{Cost, Neighborhood, WeightedGrid};
+pub struct AverageOfFour<'a, T>(&'a WeightedGrid<T>);
 
-pub fn avg_four<T: Cost>(map: &WeightedGrid<T>) -> impl ExpansionPolicy<(i32, i32)> + '_ {
-    AverageOfFour(map)
+impl<T> AverageOfFour<'_, T> {
+    pub fn new(map: &WeightedGrid<T>) -> AverageOfFour<T> {
+        AverageOfFour(map)
+    }
 }
-
-struct AverageOfFour<'a, T: Cost>(&'a WeightedGrid<T>);
 
 impl<T: Cost> ExpansionPolicy<(i32, i32)> for AverageOfFour<'_, T> {
     fn expand(&mut self, node: &SearchNode<(i32, i32)>, edges: &mut Vec<Edge<(i32, i32)>>) {

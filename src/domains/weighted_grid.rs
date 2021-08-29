@@ -1,3 +1,5 @@
+use crate::util::Neighborhood;
+
 pub struct WeightedGrid<V> {
     width: i32,
     height: i32,
@@ -19,10 +21,12 @@ impl<V> WeightedGrid<V> {
         }
     }
 
+    #[inline(always)]
     pub fn width(&self) -> i32 {
         self.width
     }
 
+    #[inline(always)]
     pub fn height(&self) -> i32 {
         self.height
     }
@@ -39,6 +43,7 @@ impl<V> WeightedGrid<V> {
         unsafe { self.get_unchecked_mut(x, y) }
     }
 
+    #[inline(always)]
     pub fn get_neighborhood(&self, x: i32, y: i32) -> Neighborhood<&V> {
         self.unpadded_bounds_check(x, y);
         unsafe { self.get_neighborhood_unchecked(x, y) }
@@ -57,6 +62,7 @@ impl<V> WeightedGrid<V> {
     }
 
     /// SAFETY: `x` must be in `0..width`, `y` must be in `0..height`.
+    #[inline(always)]
     pub unsafe fn get_neighborhood_unchecked(&self, x: i32, y: i32) -> Neighborhood<&V> {
         #[cfg(debug_assertions)]
         self.unpadded_bounds_check(x, y);
@@ -106,82 +112,6 @@ impl<V> WeightedGrid<V> {
         #[cfg(not(feature = "unsound"))]
         if !(0..self.width).contains(&x) || !(0..self.height).contains(&y) {
             panic!("Grid cell ({}, {}) is out of bounds.", x, y);
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct Neighborhood<T> {
-    pub nw: T,
-    pub n: T,
-    pub ne: T,
-    pub w: T,
-    pub c: T,
-    pub e: T,
-    pub sw: T,
-    pub s: T,
-    pub se: T,
-}
-
-impl<T> Neighborhood<T> {
-    /// Rotate clockwise 90 degrees
-    pub fn rotate_cw(self) -> Self {
-        Neighborhood {
-            c: self.c,
-            ne: self.nw,
-            e: self.n,
-            se: self.ne,
-            s: self.e,
-            sw: self.se,
-            w: self.s,
-            nw: self.sw,
-            n: self.w,
-        }
-    }
-
-    /// Flip across north-south
-    pub fn flip_ortho(self) -> Self {
-        Neighborhood {
-            n: self.n,
-            c: self.c,
-            s: self.s,
-            ne: self.nw,
-            e: self.w,
-            se: self.sw,
-            nw: self.ne,
-            w: self.e,
-            sw: self.se,
-        }
-    }
-
-    /// Flip across southwest-northeast
-    pub fn flip_diagonal(self) -> Self {
-        Neighborhood {
-            ne: self.ne,
-            c: self.c,
-            sw: self.sw,
-            n: self.e,
-            e: self.n,
-            w: self.s,
-            s: self.w,
-            nw: self.se,
-            se: self.nw,
-        }
-    }
-}
-
-impl<T: Copy> Neighborhood<&T> {
-    pub fn copied(self) -> Neighborhood<T> {
-        Neighborhood {
-            nw: *self.nw,
-            n: *self.n,
-            ne: *self.ne,
-            w: *self.w,
-            c: *self.c,
-            e: *self.e,
-            sw: *self.sw,
-            s: *self.s,
-            se: *self.se,
         }
     }
 }

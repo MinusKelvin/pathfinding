@@ -2,9 +2,6 @@ use std::f64::consts::SQRT_2;
 
 use enumset::EnumSetType;
 
-use crate::weighted_grid::WeightedGrid;
-use crate::{Cell, NodePool, Owner, SearchNode};
-
 #[derive(Debug, EnumSetType)]
 pub enum Direction {
     NorthWest,
@@ -18,75 +15,108 @@ pub enum Direction {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct GridEdge {
-    pub direction: Direction,
-    pub destination: (i32, i32),
-    pub cost: f64,
+pub struct Neighborhood<T> {
+    pub nw: T,
+    pub n: T,
+    pub ne: T,
+    pub w: T,
+    pub c: T,
+    pub e: T,
+    pub sw: T,
+    pub s: T,
+    pub se: T,
 }
 
-pub struct GridPool {
-    search_num: usize,
-    grid: WeightedGrid<Cell<SearchNode<(i32, i32)>>>,
+impl<T> Neighborhood<T> {
+    /// Rotate clockwise 90 degrees
+    pub fn rotate_cw(self) -> Self {
+        Neighborhood {
+            c: self.c,
+            ne: self.nw,
+            e: self.n,
+            se: self.ne,
+            s: self.e,
+            sw: self.se,
+            w: self.s,
+            nw: self.sw,
+            n: self.w,
+        }
+    }
+
+    /// Flip across north-south
+    pub fn flip_ortho(self) -> Self {
+        Neighborhood {
+            n: self.n,
+            c: self.c,
+            s: self.s,
+            ne: self.nw,
+            e: self.w,
+            se: self.sw,
+            nw: self.ne,
+            w: self.e,
+            sw: self.se,
+        }
+    }
+
+    /// Flip across southwest-northeast
+    pub fn flip_diagonal(self) -> Self {
+        Neighborhood {
+            ne: self.ne,
+            c: self.c,
+            sw: self.sw,
+            n: self.e,
+            e: self.n,
+            w: self.s,
+            s: self.w,
+            nw: self.se,
+            se: self.nw,
+        }
+    }
 }
 
-impl GridPool {
-    pub fn new(width: i32, height: i32) -> Self {
-        GridPool {
-            search_num: 0,
-            grid: WeightedGrid::new(width, height, |x, y| {
-                Cell::new(SearchNode {
-                    search_num: 0,
-                    expansions: 0,
-                    pqueue_location: 0,
-                    id: (x, y),
-                    parent: None,
-                    g: 0.0,
-                    lb: 0.0,
-                })
-            }),
-        }
-    }
-
-    pub fn get(&self, x: i32, y: i32, owner: &Owner) -> Option<&Cell<SearchNode<(i32, i32)>>> {
-        let cell = self.grid.get(x, y);
-        if owner.ro(cell).search_num == self.search_num {
-            Some(cell)
-        } else {
-            None
+impl<T: Copy> Neighborhood<&T> {
+    pub fn copied(self) -> Neighborhood<T> {
+        Neighborhood {
+            nw: *self.nw,
+            n: *self.n,
+            ne: *self.ne,
+            w: *self.w,
+            c: *self.c,
+            e: *self.e,
+            sw: *self.sw,
+            s: *self.s,
+            se: *self.se,
         }
     }
 }
 
-impl NodePool<(i32, i32)> for GridPool {
-    fn reset(&mut self) {
-        self.search_num += 1;
-    }
+pub trait Cost {
+    fn cost(&self) -> Option<f64>;
+}
 
-    fn generate(&self, (x, y): (i32, i32), owner: &mut Owner) -> &Cell<SearchNode<(i32, i32)>> {
-        self.grid.get(x, y);
-        unsafe {
-            // SAFETY: Bounds checked above.
-            self.generate_unchecked((x, y), owner)
-        }
-    }
+macro_rules! nz_cost_impls {
+    ($($t:ident),*) => {
+        $(
+            impl Cost for Option<std::num::$t> {
+                fn cost(&self) -> Option<f64> {
+                    self.map(|c| c.get() as f64)
+                }
+            }
+        )*
+    };
+}
 
-    unsafe fn generate_unchecked(
-        &self,
-        (x, y): (i32, i32),
-        owner: &mut Owner,
-    ) -> &Cell<SearchNode<(i32, i32)>> {
-        let cell = self.grid.get_unchecked(x, y);
-        if owner.ro(cell).search_num == self.search_num {
-            cell
-        } else {
-            let n = owner.rw(cell);
-            n.lb = f64::INFINITY;
-            n.g = f64::INFINITY;
-            n.expansions = 0;
-            n.search_num = self.search_num;
-            n.parent = None;
-            cell
-        }
+nz_cost_impls!(NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroUsize);
+
+impl Cost for f64 {
+    fn cost(&self) -> Option<f64> {
+        self.is_finite().then(|| *self)
+    }
+}
+
+impl Cost for f32 {
+    fn cost(&self) -> Option<f64> {
+        self.is_finite().then(|| *self as f64)
     }
 }
 

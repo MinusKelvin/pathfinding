@@ -1,10 +1,13 @@
+use expansion_policy::ExpansionPolicy;
+use node_pool::NodePool;
 use pqueue::PriorityQueue;
 use qcell::{TLCell, TLCellOwner};
 
-pub mod bitgrid;
+pub mod domains;
 pub mod pqueue;
 pub mod util;
-pub mod weighted_grid;
+pub mod expansion_policy;
+pub mod node_pool;
 
 #[derive(Debug, Copy, Clone)]
 pub struct SearchNode<VertexId> {
@@ -100,34 +103,6 @@ pub unsafe fn astar_unchecked<VertexId>(
                 queue.decrease_key(node, owner);
             }
         }
-    }
-}
-
-pub trait NodePool<VertexId> {
-    fn reset(&mut self);
-    fn generate(&self, id: VertexId, owner: &mut Owner) -> &Cell<SearchNode<VertexId>>;
-
-    /// SAFETY: The caller must ensure that the supplied vertex ID is in-bounds for this node pool.
-    unsafe fn generate_unchecked(
-        &self,
-        id: VertexId,
-        owner: &mut Owner,
-    ) -> &Cell<SearchNode<VertexId>> {
-        self.generate(id, owner)
-    }
-}
-
-pub trait ExpansionPolicy<VertexId> {
-    fn expand(&mut self, node: &SearchNode<VertexId>, edges: &mut Vec<Edge<VertexId>>);
-
-    /// SAFETY: The caller must ensure that the supplied vertex ID is in-bounds for this expansion
-    ///         policy.
-    unsafe fn expand_unchecked(
-        &mut self,
-        node: &SearchNode<VertexId>,
-        edges: &mut Vec<Edge<VertexId>>,
-    ) {
-        self.expand(node, edges)
     }
 }
 
