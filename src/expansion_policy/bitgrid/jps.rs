@@ -2,9 +2,10 @@ use std::f64::consts::SQRT_2;
 
 use enumset::EnumSet;
 
-use crate::util::Direction;
-use crate::{Edge, ExpansionPolicy, SearchNode};
 use crate::domains::BitGrid;
+use crate::node_pool::GridPool;
+use crate::util::Direction;
+use crate::{astar_unchecked, Edge, ExpansionPolicy, Owner, SearchNode};
 
 pub fn create_tmap(map: &BitGrid) -> BitGrid {
     let mut tmap = BitGrid::new(map.height(), map.width());
@@ -23,12 +24,40 @@ pub struct JpsExpansionPolicy<'a> {
 }
 
 impl<'a> JpsExpansionPolicy<'a> {
-    pub fn new(map: &'a BitGrid, tmap: &'a BitGrid, goal: (i32, i32)) -> Self {
-        // SAFETY: While tmap is supposed to be a transposed copy of the map, our safety requirements
-        //         are less strict - tmap need only have transposed width and height.
+    pub fn new(map: &'a BitGrid, tmap: &'a BitGrid) -> Self {
+        // SAFETY: While tmap is supposed to be a transposed copy of the map, our safety
+        //         requirements are less strict - tmap need only have transposed width and height.
         assert_eq!(map.width(), tmap.height());
         assert_eq!(map.height(), tmap.width());
-        JpsExpansionPolicy { map, tmap, goal }
+        JpsExpansionPolicy {
+            map,
+            tmap,
+            goal: (-1, -1),
+        }
+    }
+
+    pub fn set_goal(&mut self, new_goal: (i32, i32)) {
+        self.goal = new_goal;
+    }
+
+    pub fn search(
+        &mut self,
+        pool: &mut GridPool,
+        owner: &mut Owner,
+        h: impl FnMut((i32, i32)) -> f64,
+        source: (i32, i32),
+        goal: (i32, i32),
+    ) {
+        assert!(pool.width() >= self.map.width());
+        assert!(pool.height() >= self.map.height());
+        self.map.get_neighbors(source.0, source.1);
+        self.goal = goal;
+        unsafe {
+            // SAFETY: We check that the pool is large enough for our map.
+            //         Our implementation never produces edges to cells that are out-of-bounds.
+            //         We check that the source cell is in-bounds.
+            astar_unchecked(pool, owner, self, h, source, goal)
+        }
     }
 }
 

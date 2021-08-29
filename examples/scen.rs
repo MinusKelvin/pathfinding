@@ -4,7 +4,6 @@ use std::str::FromStr;
 use pathfinding::domains::BitGrid;
 use pathfinding::expansion_policy::bitgrid::jps::{create_tmap, JpsExpansionPolicy};
 use pathfinding::expansion_policy::bitgrid::no_corner_cutting::NoCornerCutting;
-use pathfinding::expansion_policy::ExpansionPolicy;
 use pathfinding::node_pool::{GridPool, NodePool};
 use pathfinding::util::{octile_heuristic, zero_heuristic};
 use pathfinding::Owner;
@@ -44,25 +43,40 @@ pub fn main() {
     match options.algorithm {
         Algorithm::Dijkstra => {
             let map = read_map(&options.map);
-            run(&instances, map.width(), map.height(), |_| {
-                (NoCornerCutting::new(&map), zero_heuristic())
-            });
+            let mut expansion_policy = NoCornerCutting::new(&map);
+            run(
+                &instances,
+                map.width(),
+                map.height(),
+                |pool, owner, source, goal| {
+                    expansion_policy.search(pool, owner, zero_heuristic(), source, goal)
+                },
+            );
         }
         Algorithm::AStar => {
             let map = read_map(&options.map);
-            run(&instances, map.width(), map.height(), |goal| {
-                (NoCornerCutting::new(&map), octile_heuristic(goal, 1.0))
-            });
+            let mut expansion_policy = NoCornerCutting::new(&map);
+            run(
+                &instances,
+                map.width(),
+                map.height(),
+                |pool, owner, source, goal| {
+                    expansion_policy.search(pool, owner, octile_heuristic(goal, 1.0), source, goal)
+                },
+            );
         }
         Algorithm::Jps => {
             let map = read_map(&options.map);
             let tmap = create_tmap(&map);
-            run(&instances, map.width(), map.height(), |goal| {
-                (
-                    JpsExpansionPolicy::new(&map, &tmap, goal),
-                    octile_heuristic(goal, 1.0),
-                )
-            });
+            let mut expansion_policy = JpsExpansionPolicy::new(&map, &tmap);
+            run(
+                &instances,
+                map.width(),
+                map.height(),
+                |pool, owner, source, goal| {
+                    expansion_policy.search(pool, owner, octile_heuristic(goal, 1.0), source, goal)
+                },
+            );
         }
     }
 }
@@ -128,33 +142,19 @@ fn read_map(path: &Path) -> BitGrid {
     grid
 }
 
-fn run<E, H>(
+fn run(
     instances: &[Instance],
     width: i32,
     height: i32,
-    mut init: impl FnMut((i32, i32)) -> (E, H),
-) where
-    E: ExpansionPolicy<(i32, i32)>,
-    H: Fn((i32, i32)) -> f64,
-{
+    mut search: impl FnMut(&mut GridPool, &mut Owner, (i32, i32), (i32, i32)),
+) {
     let mut owner = Owner::new();
     let mut pool = GridPool::new(width, height);
 
     let t = std::time::Instant::now();
     for instance in instances {
-        let (mut expander, heuristic) = init(instance.to);
         let t = std::time::Instant::now();
-        unsafe {
-            // definitely not safe
-            pathfinding::astar_unchecked(
-                &mut pool,
-                &mut owner,
-                &mut expander,
-                heuristic,
-                instance.from,
-                instance.to,
-            );
-        }
+        search(&mut pool, &mut owner, instance.from, instance.to);
         eprintln!(
             "{:?} -> {:?}: {:.2?}",
             instance.from,

@@ -1,14 +1,34 @@
 use std::f64::consts::SQRT_2;
 
-use crate::util::Direction;
-use crate::{Edge, ExpansionPolicy, SearchNode};
 use crate::domains::BitGrid;
+use crate::node_pool::GridPool;
+use crate::util::Direction;
+use crate::{Edge, ExpansionPolicy, Owner, SearchNode, astar_unchecked};
 
 pub struct NoCornerCutting<'a>(&'a BitGrid);
 
 impl NoCornerCutting<'_> {
     pub fn new(map: &BitGrid) -> NoCornerCutting {
         NoCornerCutting(map)
+    }
+
+    pub fn search(
+        &mut self,
+        pool: &mut GridPool,
+        owner: &mut Owner,
+        h: impl FnMut((i32, i32)) -> f64,
+        source: (i32, i32),
+        goal: (i32, i32),
+    ) {
+        assert!(pool.width() >= self.0.width());
+        assert!(pool.height() >= self.0.height());
+        self.0.get_neighbors(source.0, source.1);
+        unsafe {
+            // SAFETY: We check that the pool is large enough for our map.
+            //         Our implementation never produces edges to cells that are out-of-bounds.
+            //         We check that the source cell is in-bounds.
+            astar_unchecked(pool, owner, self, h, source, goal)
+        }
     }
 }
 
