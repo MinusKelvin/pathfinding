@@ -4,7 +4,7 @@ use enumset::EnumSet;
 
 use crate::domains::BitGrid;
 use crate::node_pool::GridPool;
-use crate::util::Direction;
+use crate::util::{Direction, GridDomain};
 use crate::{astar_unchecked, Edge, ExpansionPolicy, Owner, SearchNode};
 
 pub fn create_tmap(map: &BitGrid) -> BitGrid {
@@ -58,6 +58,16 @@ impl<'a> JpsExpansionPolicy<'a> {
             //         We check that the source cell is in-bounds.
             astar_unchecked(pool, owner, self, h, source, goal)
         }
+    }
+}
+
+unsafe impl GridDomain for JpsExpansionPolicy<'_> {
+    fn width(&self) -> i32 {
+        self.map.width()
+    }
+
+    fn height(&self) -> i32 {
+        self.map.height()
     }
 }
 

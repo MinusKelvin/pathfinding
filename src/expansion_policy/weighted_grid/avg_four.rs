@@ -1,7 +1,7 @@
 use std::f64::consts::SQRT_2;
 
 use crate::domains::WeightedGrid;
-use crate::util::{Cost, Neighborhood};
+use crate::util::{Cost, GridDomain, Neighborhood};
 use crate::{Edge, ExpansionPolicy, SearchNode};
 
 pub struct AverageOfFour<'a, T>(&'a WeightedGrid<T>);
@@ -9,6 +9,16 @@ pub struct AverageOfFour<'a, T>(&'a WeightedGrid<T>);
 impl<T> AverageOfFour<'_, T> {
     pub fn new(map: &WeightedGrid<T>) -> AverageOfFour<T> {
         AverageOfFour(map)
+    }
+}
+
+unsafe impl<T> GridDomain for AverageOfFour<'_, T> {
+    fn width(&self) -> i32 {
+        self.0.width()
+    }
+
+    fn height(&self) -> i32 {
+        self.0.height()
     }
 }
 

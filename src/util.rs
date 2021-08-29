@@ -2,6 +2,48 @@ use std::f64::consts::SQRT_2;
 
 use enumset::EnumSetType;
 
+use crate::expansion_policy::ExpansionPolicy;
+use crate::node_pool::NodePool;
+use crate::{astar_unchecked, Owner};
+
+/// Indicates that the implementing type guarantees the following invariants:
+///
+/// If `Self` is a `NodePool<(i32, i32)>`:
+/// - All coordinates from `(0, 0)` inclusive to `(self.width(), self.height())` exclusive are
+///   in-bounds.
+///
+/// If `Self` is an `ExpansionPolicy<(i32, i32)>`:
+/// - All coordinates from `(0, 0)` inclusive to `(self.width(), self.height())` exclusive are
+///   in-bounds.
+/// - The coordinates of the destinations of all edges produced by `expand_unchecked` are in-bounds.
+pub unsafe trait GridDomain {
+    fn width(&self) -> i32;
+    fn height(&self) -> i32;
+}
+
+pub fn grid_search<N, E>(
+    pool: &mut N,
+    owner: &mut Owner,
+    expansion_policy: &mut E,
+    h: impl FnMut((i32, i32)) -> f64,
+    source: (i32, i32),
+    goal: (i32, i32),
+) where
+    N: NodePool<(i32, i32)> + GridDomain,
+    E: ExpansionPolicy<(i32, i32)> + GridDomain,
+{
+    assert!(pool.width() >= expansion_policy.width());
+    assert!(pool.height() >= expansion_policy.height());
+    assert!(source.0 >= 0 && source.0 < expansion_policy.width());
+    assert!(source.1 >= 0 && source.1 < expansion_policy.height());
+    unsafe {
+        // SAFETY: We check that the pool is large enough for the expansion policy. The expansion
+        //         policy guarantees that it never produces edges leading out-of-bounds. We check
+        //         that the source cell is in-bounds.
+        astar_unchecked(pool, owner, expansion_policy, h, source, goal)
+    }
+}
+
 #[derive(Debug, EnumSetType)]
 pub enum Direction {
     NorthWest,

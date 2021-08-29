@@ -1,3 +1,4 @@
+use crate::util::GridDomain;
 use crate::{Cell, Owner, SearchNode};
 use crate::domains::WeightedGrid;
 
@@ -26,14 +27,6 @@ impl GridPool {
         }
     }
 
-    pub fn width(&self) -> i32 {
-        self.grid.width()
-    }
-
-    pub fn height(&self) -> i32 {
-        self.grid.height()
-    }
-
     pub fn get(&self, x: i32, y: i32, owner: &Owner) -> Option<&Cell<SearchNode<(i32, i32)>>> {
         let cell = self.grid.get(x, y);
         if owner.ro(cell).search_num == self.search_num {
@@ -41,6 +34,16 @@ impl GridPool {
         } else {
             None
         }
+    }
+}
+
+unsafe impl GridDomain for GridPool {
+    fn width(&self) -> i32 {
+        self.grid.width()
+    }
+
+    fn height(&self) -> i32 {
+        self.grid.height()
     }
 }
 
