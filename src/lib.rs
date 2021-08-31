@@ -70,7 +70,7 @@ pub unsafe fn astar_unchecked<VertexId>(
 ) where
     VertexId: Copy + Eq,
 {
-    pool.reset();
+    pool.reset(owner);
     let mut queue = PriorityQueue::new();
     let mut edges = vec![];
 
@@ -108,8 +108,8 @@ pub unsafe fn astar_unchecked<VertexId>(
 
 struct SafeNodePool<'a, N>(&'a mut N);
 impl<V, N: NodePool<V>> NodePool<V> for SafeNodePool<'_, N> {
-    fn reset(&mut self) {
-        self.0.reset()
+    fn reset(&mut self, owner: &mut Owner) {
+        self.0.reset(owner)
     }
 
     fn generate(&self, id: V, owner: &mut Owner) -> &Cell<SearchNode<V>> {

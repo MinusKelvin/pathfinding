@@ -48,7 +48,7 @@ unsafe impl GridDomain for GridPool {
 }
 
 impl NodePool<(i32, i32)> for GridPool {
-    fn reset(&mut self) {
+    fn reset(&mut self, _: &mut Owner) {
         self.search_num += 1;
     }
 

@@ -44,31 +44,21 @@ pub fn main() {
     match options.algorithm {
         Algorithm::Dijkstra => {
             let map = read_map(&options.map);
-            run(
-                &instances,
-                map.width(),
-                map.height(),
-                &mut NoCornerCutting::new(&map),
-                |_, _| zero_heuristic(),
-            );
+            run(&instances, &mut NoCornerCutting::new(&map), |_, _| {
+                zero_heuristic()
+            });
         }
         Algorithm::AStar => {
             let map = read_map(&options.map);
-            run(
-                &instances,
-                map.width(),
-                map.height(),
-                &mut NoCornerCutting::new(&map),
-                |_, goal| octile_heuristic(goal, 1.0),
-            );
+            run(&instances, &mut NoCornerCutting::new(&map), |_, goal| {
+                octile_heuristic(goal, 1.0)
+            });
         }
         Algorithm::Jps => {
             let map = read_map(&options.map);
             let tmap = create_tmap(&map);
             run(
                 &instances,
-                map.width(),
-                map.height(),
                 &mut JpsExpansionPolicy::new(&map, &tmap),
                 move |expansion_policy, goal| {
                     expansion_policy.set_goal(goal);
@@ -142,8 +132,6 @@ fn read_map(path: &Path) -> BitGrid {
 
 fn run<E, H>(
     instances: &[Instance],
-    width: i32,
-    height: i32,
     expansion_policy: &mut E,
     mut init: impl FnMut(&mut E, (i32, i32)) -> H,
 ) where
@@ -151,7 +139,7 @@ fn run<E, H>(
     H: FnMut((i32, i32)) -> f64,
 {
     let mut owner = Owner::new();
-    let mut pool = GridPool::new(width, height);
+    let mut pool = GridPool::new(expansion_policy.width(), expansion_policy.height());
 
     let t = std::time::Instant::now();
     for instance in instances {

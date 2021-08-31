@@ -9,6 +9,7 @@ edition = "2018"
 unsound = []
 
 [dependencies]
+bumpalo = "3.7.0"
 enumset = "1.0.7"
 qcell = "0.4.1"
 
