@@ -2,6 +2,7 @@ use crate::{Edge, SearchNode};
 
 pub mod bitgrid;
 pub mod weighted_grid;
+pub mod graph;
 
 pub trait ExpansionPolicy<VertexId> {
     fn expand(&mut self, node: &SearchNode<VertexId>, edges: &mut Vec<Edge<VertexId>>);
