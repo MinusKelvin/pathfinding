@@ -4,6 +4,8 @@ mod gridpool;
 pub use self::gridpool::GridPool;
 mod hashpool;
 pub use self::hashpool::HashPool;
+mod indexpool;
+pub use self::indexpool::IndexPool;
 
 pub trait NodePool<VertexId> {
     fn reset(&mut self, owner: &mut Owner);

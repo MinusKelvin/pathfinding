@@ -48,8 +48,21 @@ unsafe impl GridDomain for GridPool {
 }
 
 impl NodePool<(i32, i32)> for GridPool {
-    fn reset(&mut self, _: &mut Owner) {
-        self.search_num += 1;
+    fn reset(&mut self, owner: &mut Owner) {
+        match self.search_num.checked_add(1) {
+            Some(ok) => self.search_num = ok,
+            None => {
+                // on the off chance we do a search while there are still nodes with search nums
+                // equal to the new search num after an overflow, it would be a *really* hard to
+                // diagnose logic bug, so we nip it in the bud by resetting everything on overflow.
+                self.search_num = 1;
+                for y in 0..self.grid.height() {
+                    for x in 0..self.grid.width() {
+                        owner.rw(self.grid.get(x, y)).search_num = 0;
+                    }
+                }
+            }
+        }
     }
 
     fn generate(&self, (x, y): (i32, i32), owner: &mut Owner) -> &Cell<SearchNode<(i32, i32)>> {
