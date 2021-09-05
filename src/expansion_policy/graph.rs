@@ -4,6 +4,12 @@ use super::ExpansionPolicy;
 
 pub struct OutgoingEdges<'a, V>(&'a DirectedGraph<V>);
 
+impl<'a, V> OutgoingEdges<'a, V> {
+    pub fn new(graph: &'a DirectedGraph<V>) -> Self {
+        OutgoingEdges(graph)
+    }
+}
+
 impl<V> ExpansionPolicy<usize> for OutgoingEdges<'_, V> {
     unsafe fn expand_unchecked(
         &mut self,
@@ -23,6 +29,12 @@ impl<V> ExpansionPolicy<usize> for OutgoingEdges<'_, V> {
 }
 
 pub struct IncomingEdges<'a, V>(&'a DirectedGraph<V>);
+
+impl<'a, V> IncomingEdges<'a, V> {
+    pub fn new(graph: &'a DirectedGraph<V>) -> Self {
+        IncomingEdges(graph)
+    }
+}
 
 impl<V> ExpansionPolicy<usize> for IncomingEdges<'_, V> {
     unsafe fn expand_unchecked(
