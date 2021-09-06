@@ -107,7 +107,6 @@ impl<V> WeightedGrid<V> {
     #[track_caller]
     #[inline(always)]
     fn padded_bounds_check(&self, x: i32, y: i32) {
-        #[cfg(not(feature = "unsound"))]
         if !(-1..self.width + 1).contains(&x) || !(-1..self.height + 1).contains(&y) {
             panic!("Grid cell ({}, {}) is out of bounds.", x, y);
         }
@@ -116,7 +115,6 @@ impl<V> WeightedGrid<V> {
     #[track_caller]
     #[inline(always)]
     fn unpadded_bounds_check(&self, x: i32, y: i32) {
-        #[cfg(not(feature = "unsound"))]
         if !(0..self.width).contains(&x) || !(0..self.height).contains(&y) {
             panic!("Grid cell ({}, {}) is out of bounds.", x, y);
         }
