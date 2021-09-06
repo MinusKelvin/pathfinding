@@ -1,10 +1,11 @@
+use crate::util::IndexDomain;
 use crate::{Cell, Owner, SearchNode};
 
 use super::NodePool;
 
 pub struct IndexPool {
     search_num: usize,
-    pool: Vec<Cell<SearchNode<usize>>>,
+    pool: Box<[Cell<SearchNode<usize>>]>,
 }
 
 impl IndexPool {
@@ -23,7 +24,7 @@ impl IndexPool {
         }
         IndexPool {
             search_num: 0,
-            pool,
+            pool: pool.into_boxed_slice(),
         }
     }
 }
@@ -37,7 +38,7 @@ impl NodePool<usize> for IndexPool {
                 // equal to the new search num after an overflow, it would be a *really* hard to
                 // diagnose logic bug, so we nip it in the bud by resetting everything on overflow.
                 self.search_num = 1;
-                for node in &self.pool {
+                for node in self.pool.iter() {
                     owner.rw(node).search_num = 0;
                 }
             }
@@ -69,5 +70,11 @@ impl NodePool<usize> for IndexPool {
             n.parent = None;
             cell
         }
+    }
+}
+
+unsafe impl IndexDomain for IndexPool {
+    fn len(&self) -> usize {
+        self.pool.len()
     }
 }

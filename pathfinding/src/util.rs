@@ -9,13 +9,11 @@ use crate::{astar_unchecked, Owner};
 /// Indicates that the implementing type guarantees the following invariants:
 ///
 /// If `Self` is a `NodePool<(i32, i32)>`:
-/// - All coordinates from `(0, 0)` inclusive to `(self.width(), self.height())` exclusive are
-///   in-bounds.
+/// - All ids from `(0, 0)` inclusive to `(self.width(), self.height())` exclusive are in-bounds.
 ///
 /// If `Self` is an `ExpansionPolicy<(i32, i32)>`:
-/// - All coordinates from `(0, 0)` inclusive to `(self.width(), self.height())` exclusive are
-///   in-bounds.
-/// - The coordinates of the destinations of all edges produced by `expand_unchecked` are in-bounds.
+/// - All ids from `(0, 0)` inclusive to `(self.width(), self.height())` exclusive are in-bounds.
+/// - The ids of the destinations of all edges produced by `expand_unchecked` are in-bounds.
 pub unsafe trait GridDomain {
     fn width(&self) -> i32;
     fn height(&self) -> i32;
@@ -39,7 +37,40 @@ pub fn grid_search<N, E>(
     unsafe {
         // SAFETY: We check that the pool is large enough for the expansion policy. The expansion
         //         policy guarantees that it never produces edges leading out-of-bounds. We check
-        //         that the source cell is in-bounds.
+        //         that the source vertex is in-bounds.
+        astar_unchecked(pool, owner, expansion_policy, h, source, goal)
+    }
+}
+
+/// Indicates that the implementing type guarantees the following invariants:
+///
+/// If `Self` is a `NodePool<usize>`:
+/// - All ids from `0` inclusive to `self.len()` exclusive are in-bounds.
+///
+/// If `Self` is an `ExpansionPolicy<usize>`:
+/// - All ids from `0` inclusive to `self.len()` exclusive are in-bounds.
+/// - The ids of the destinations of all edges produced by `expand_unchecked` are in-bounds.
+pub unsafe trait IndexDomain {
+    fn len(&self) -> usize;
+}
+
+pub fn index_search<N, E>(
+    pool: &mut N,
+    owner: &mut Owner,
+    expansion_policy: &mut E,
+    h: impl FnMut(usize) -> f64,
+    source: usize,
+    goal: usize,
+) where
+    N: NodePool<usize> + IndexDomain,
+    E: ExpansionPolicy<usize> + IndexDomain,
+{
+    assert!(pool.len() >= expansion_policy.len());
+    assert!(source < expansion_policy.len());
+    unsafe {
+        // SAFETY: We check that the pool is large enough for the expansion policy. The expansion
+        //         policy guarantees that it never produces edges leading out-of-bounds. We check
+        //         that the source vertex is in-bounds.
         astar_unchecked(pool, owner, expansion_policy, h, source, goal)
     }
 }

@@ -1,4 +1,5 @@
 use crate::domains::DirectedGraph;
+use crate::util::IndexDomain;
 
 use super::ExpansionPolicy;
 
@@ -28,6 +29,13 @@ impl<V> ExpansionPolicy<usize> for OutgoingEdges<'_, V> {
     }
 }
 
+// SAFETY: DirectedGraph always contains valid edges, so all edges are in-bounds.
+unsafe impl<V> IndexDomain for OutgoingEdges<'_, V> {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
 pub struct IncomingEdges<'a, V>(&'a DirectedGraph<V>);
 
 impl<'a, V> IncomingEdges<'a, V> {
@@ -54,3 +62,9 @@ impl<V> ExpansionPolicy<usize> for IncomingEdges<'_, V> {
     }
 }
 
+// SAFETY: DirectedGraph always contains valid edges, so all edges are in-bounds.
+unsafe impl<V> IndexDomain for IncomingEdges<'_, V> {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}

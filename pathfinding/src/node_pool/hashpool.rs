@@ -4,7 +4,7 @@ use std::hash::{BuildHasher, Hash};
 
 use bumpalo::Bump;
 
-use crate::util::GridDomain;
+use crate::util::{GridDomain, IndexDomain};
 use crate::{Cell, Owner, SearchNode};
 
 use super::NodePool;
@@ -84,7 +84,7 @@ impl<V, S: Default> Default for HashPool<V, S> {
 //         just self-references, so we don't care what thread we're on.
 unsafe impl<V: Send, S: Send> Send for HashPool<V, S> {}
 
-// SAFETY: all coordinates are in-bounds, so obviously the required invariant holds.
+// SAFETY: all ids are in-bounds, so obviously the required invariant holds.
 unsafe impl<S> GridDomain for HashPool<(i32, i32), S> {
     fn width(&self) -> i32 {
         i32::MAX
@@ -92,5 +92,12 @@ unsafe impl<S> GridDomain for HashPool<(i32, i32), S> {
 
     fn height(&self) -> i32 {
         i32::MAX
+    }
+}
+
+// SAFETY: all ids are in-bounds, so obviously the required invariant holds.
+unsafe impl<S> IndexDomain for HashPool<usize, S> {
+    fn len(&self) -> usize {
+        usize::MAX
     }
 }
