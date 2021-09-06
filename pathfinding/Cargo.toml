@@ -12,6 +12,7 @@ unsound = []
 bumpalo = "3.7.0"
 enumset = "1.0.7"
 qcell = "0.4.1"
+serde = { version = "1.0.130", optional = true, features = ["derive"] }
 
 [dev-dependencies]
 rand = { version = "0.8.4", features = ["min_const_gen"] }

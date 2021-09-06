@@ -179,6 +179,76 @@ impl BitGrid {
     }
 }
 
+#[cfg(feature = "serde")]
+mod serde {
+    use serde::de::{Error, Visitor};
+    use serde::ser::SerializeSeq;
+    use serde::{Deserialize, Serialize};
+
+    impl Serialize for super::BitGrid {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            let cells = self.width as usize * self.height as usize;
+            let mut s = serializer.serialize_seq(Some(cells + 2))?;
+            s.serialize_element(&self.width)?;
+            s.serialize_element(&self.height)?;
+            for y in 0..self.height {
+                for x in 0..self.width {
+                    s.serialize_element(&self.get(x, y))?;
+                }
+            }
+            s.end()
+        }
+    }
+
+    impl<'de> Deserialize<'de> for super::BitGrid {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            deserializer.deserialize_seq(BitGridVisitor)
+        }
+    }
+
+    struct BitGridVisitor;
+    impl<'de> Visitor<'de> for BitGridVisitor {
+        type Value = super::BitGrid;
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+        {
+            let width = seq
+                .next_element()?
+                .ok_or_else(|| Error::invalid_length(0, &self))?;
+            let height = seq
+                .next_element()?
+                .ok_or_else(|| Error::invalid_length(1, &self))?;
+
+            let mut grid = super::BitGrid::new(width, height);
+            for y in 0..height {
+                for x in 0..width {
+                    let i = 2 + x as usize + y as usize * width as usize;
+                    grid.set(
+                        x,
+                        y,
+                        seq.next_element()?
+                            .ok_or_else(|| Error::invalid_length(i, &self))?,
+                    );
+                }
+            }
+
+            Ok(grid)
+        }
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(formatter, "a sequence of values")
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

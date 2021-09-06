@@ -122,3 +122,72 @@ impl<V> WeightedGrid<V> {
         }
     }
 }
+
+#[cfg(feature = "serde")]
+mod serde {
+    use std::marker::PhantomData;
+
+    use serde::de::{Error, Visitor};
+    use serde::ser::SerializeSeq;
+    use serde::{Deserialize, Serialize};
+
+    impl<V: Serialize> Serialize for super::WeightedGrid<V> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            let cells = self.width as usize * self.height as usize;
+            let mut s = serializer.serialize_seq(Some(cells + 2))?;
+            s.serialize_element(&self.width)?;
+            s.serialize_element(&self.height)?;
+            for y in 0..self.height {
+                for x in 0..self.width {
+                    s.serialize_element(&self.get(x, y))?;
+                }
+            }
+            s.end()
+        }
+    }
+
+    impl<'de, V: Deserialize<'de>> Deserialize<'de> for super::WeightedGrid<V> {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            deserializer.deserialize_seq(WeightedGridVisitor(PhantomData))
+        }
+    }
+
+    struct WeightedGridVisitor<V>(PhantomData<V>);
+    impl<'de, V: Deserialize<'de>> Visitor<'de> for WeightedGridVisitor<V> {
+        type Value = super::WeightedGrid<V>;
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+        {
+            let width = seq
+                .next_element()?
+                .ok_or_else(|| Error::invalid_length(0, &self))?;
+            let height = seq
+                .next_element()?
+                .ok_or_else(|| Error::invalid_length(1, &self))?;
+
+            let mut grid = super::WeightedGrid::new(width, height);
+            for y in 0..height {
+                for x in 0..width {
+                    let i = 2 + x as usize + y as usize * width as usize;
+                    *grid.get_mut(x, y) = seq
+                        .next_element()?
+                        .ok_or_else(|| Error::invalid_length(i, &self))?;
+                }
+            }
+
+            Ok(grid)
+        }
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(formatter, "a sequence of values")
+        }
+    }
+}
