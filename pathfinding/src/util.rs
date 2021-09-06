@@ -133,34 +133,34 @@ impl<T: Copy> Neighborhood<&T> {
 }
 
 pub trait Cost {
-    fn cost(&self) -> Option<f64>;
+    fn cost(&self) -> f64;
 }
 
 macro_rules! nz_cost_impls {
     ($($t:ident),*) => {
         $(
-            impl Cost for Option<std::num::$t> {
-                fn cost(&self) -> Option<f64> {
-                    self.map(|c| c.get() as f64)
+            impl Cost for std::num::$t {
+                fn cost(&self) -> f64 {
+                    self.get() as f64
                 }
             }
         )*
     };
 }
-
 nz_cost_impls!(NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroUsize);
 
-impl Cost for f64 {
-    fn cost(&self) -> Option<f64> {
-        self.is_finite().then(|| *self)
-    }
+macro_rules! prim_cost_impls {
+    ($($t:ty),*) => {
+        $(
+            impl Cost for $t {
+                fn cost(&self) -> f64 {
+                    *self as f64
+                }
+            }
+        )*
+    };
 }
-
-impl Cost for f32 {
-    fn cost(&self) -> Option<f64> {
-        self.is_finite().then(|| *self as f64)
-    }
-}
+prim_cost_impls!(u8, u16, u32, u64, usize, f32, f64, i8, i16, i32, i64, isize);
 
 pub fn octile_heuristic((tx, ty): (i32, i32), scale: f64) -> impl Fn((i32, i32)) -> f64 {
     move |(x, y)| {

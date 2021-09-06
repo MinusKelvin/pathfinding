@@ -38,26 +38,26 @@ impl<T: Cost> ExpansionPolicy<(i32, i32)> for AverageOfFour<'_, T> {
     ) {
         let &mut AverageOfFour(map) = self;
         let neighborhood = map.get_neighborhood_unchecked(node.id.0, node.id.1);
-        let c = neighborhood.c.cost().unwrap();
-        if let Some(cost) = neighborhood.n.cost() {
+        let c = neighborhood.c.map(Cost::cost).unwrap();
+        if let Some(cost) = neighborhood.n.map(Cost::cost) {
             edges.push(Edge {
                 destination: (node.id.0, node.id.1 - 1),
                 cost: (cost + c) / 2.0,
             });
         }
-        if let Some(cost) = neighborhood.s.cost() {
+        if let Some(cost) = neighborhood.s.map(Cost::cost) {
             edges.push(Edge {
                 destination: (node.id.0, node.id.1 + 1),
                 cost: (cost + c) / 2.0,
             });
         }
-        if let Some(cost) = neighborhood.w.cost() {
+        if let Some(cost) = neighborhood.w.map(Cost::cost) {
             edges.push(Edge {
                 destination: (node.id.0 - 1, node.id.1),
                 cost: (cost + c) / 2.0,
             });
         }
-        if let Some(cost) = neighborhood.e.cost() {
+        if let Some(cost) = neighborhood.e.map(Cost::cost) {
             edges.push(Edge {
                 destination: (node.id.0 + 1, node.id.1),
                 cost: (cost + c) / 2.0,
@@ -90,12 +90,12 @@ impl<T: Cost> ExpansionPolicy<(i32, i32)> for AverageOfFour<'_, T> {
     }
 }
 
-impl<T: Cost> Neighborhood<&T> {
+impl<T: Cost> Neighborhood<Option<&T>> {
     fn nw_cost(&self) -> Option<f64> {
-        let c = self.c.cost()?;
-        let n = self.n.cost()?;
-        let w = self.w.cost()?;
-        let nw = self.nw.cost()?;
+        let c = self.c?.cost();
+        let n = self.n?.cost();
+        let w = self.w?.cost();
+        let nw = self.nw?.cost();
         Some((c + n + w + nw) * SQRT_2 / 4.0)
     }
 

@@ -3,21 +3,25 @@ use crate::util::Neighborhood;
 pub struct WeightedGrid<V> {
     width: i32,
     height: i32,
-    cells: Box<[V]>,
+    cells: Box<[Option<V>]>,
 }
 
 impl<V> WeightedGrid<V> {
-    pub fn new(width: i32, height: i32, mut init: impl FnMut(i32, i32) -> V) -> Self {
-        let mut cells = vec![];
-        for y in -1..height + 1 {
-            for x in -1..width {
-                cells.push(init(x, y));
-            }
-        }
+    /// Constructs a fully-obstructed weighted grid.
+    pub fn new(width: i32, height: i32) -> Self {
+        assert!(width > 0 && height > 0, "width and height must be positive");
+        // there is 1 padding entry at the end of each row
+        let padded_width = width as usize + 1;
+        // there is a padding row above and a padding row below.
+        let padded_height = height as usize + 2;
+        // there is one extra entry so that the unpadded coordinate (width, height),
+        // which is 1 cell out of bounds on each axis, can be dereferenced.
+        let padded_size = padded_width * padded_height + 1;
+
         WeightedGrid {
             width,
             height,
-            cells: cells.into_boxed_slice(),
+            cells: std::iter::repeat_with(|| None).take(padded_size).collect(),
         }
     }
 
@@ -32,53 +36,56 @@ impl<V> WeightedGrid<V> {
     }
 
     #[inline(always)]
-    pub fn get(&self, x: i32, y: i32) -> &V {
+    pub fn get(&self, x: i32, y: i32) -> Option<&V> {
         self.padded_bounds_check(x, y);
         unsafe { self.get_unchecked(x, y) }
     }
 
     #[inline(always)]
-    pub fn get_mut(&mut self, x: i32, y: i32) -> &mut V {
-        self.padded_bounds_check(x, y);
+    pub fn get_mut(&mut self, x: i32, y: i32) -> &mut Option<V> {
+        self.unpadded_bounds_check(x, y);
         unsafe { self.get_unchecked_mut(x, y) }
     }
 
     #[inline(always)]
-    pub fn get_neighborhood(&self, x: i32, y: i32) -> Neighborhood<&V> {
+    pub fn get_neighborhood(&self, x: i32, y: i32) -> Neighborhood<Option<&V>> {
         self.unpadded_bounds_check(x, y);
         unsafe { self.get_neighborhood_unchecked(x, y) }
     }
 
     /// SAFETY: `x` must be in `-1..width+1`, `y` must be in `-1..height+1`.
+    /// Padding cells can be relied upon being `None`.
     #[inline(always)]
-    pub unsafe fn get_unchecked(&self, x: i32, y: i32) -> &V {
-        self.cells.get_unchecked(self.locate(x, y))
+    pub unsafe fn get_unchecked(&self, x: i32, y: i32) -> Option<&V> {
+        self.cells.get_unchecked(self.locate(x, y)).as_ref()
     }
 
-    /// SAFETY: `x` must be in `-1..width+1`, `y` must be in `-1..height+1`.
+    /// SAFETY: `x` must be in `0..width`, `y` must be in `0..height`.
+    /// Padding cells can be relied upon being `None`.
     #[inline(always)]
-    pub unsafe fn get_unchecked_mut(&mut self, x: i32, y: i32) -> &mut V {
+    pub unsafe fn get_unchecked_mut(&mut self, x: i32, y: i32) -> &mut Option<V> {
         self.cells.get_unchecked_mut(self.locate(x, y))
     }
 
     /// SAFETY: `x` must be in `0..width`, `y` must be in `0..height`.
+    /// Padding cells can be relied upon being `None`.
     #[inline(always)]
-    pub unsafe fn get_neighborhood_unchecked(&self, x: i32, y: i32) -> Neighborhood<&V> {
+    pub unsafe fn get_neighborhood_unchecked(&self, x: i32, y: i32) -> Neighborhood<Option<&V>> {
         #[cfg(debug_assertions)]
         self.unpadded_bounds_check(x, y);
 
         let idx = self.locate(x, y);
         let padded_width = self.width as usize - 1;
         Neighborhood {
-            nw: self.cells.get_unchecked(idx - padded_width - 1),
-            n: self.cells.get_unchecked(idx - padded_width),
-            ne: self.cells.get_unchecked(idx - padded_width + 1),
-            w: self.cells.get_unchecked(idx - 1),
-            c: self.cells.get_unchecked(idx),
-            e: self.cells.get_unchecked(idx + 1),
-            sw: self.cells.get_unchecked(idx + padded_width - 1),
-            s: self.cells.get_unchecked(idx + padded_width),
-            se: self.cells.get_unchecked(idx + padded_width + 1),
+            nw: self.cells.get_unchecked(idx - padded_width - 1).as_ref(),
+            n: self.cells.get_unchecked(idx - padded_width).as_ref(),
+            ne: self.cells.get_unchecked(idx - padded_width + 1).as_ref(),
+            w: self.cells.get_unchecked(idx - 1).as_ref(),
+            c: self.cells.get_unchecked(idx).as_ref(),
+            e: self.cells.get_unchecked(idx + 1).as_ref(),
+            sw: self.cells.get_unchecked(idx + padded_width - 1).as_ref(),
+            s: self.cells.get_unchecked(idx + padded_width).as_ref(),
+            se: self.cells.get_unchecked(idx + padded_width + 1).as_ref(),
         }
     }
 
