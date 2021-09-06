@@ -20,7 +20,8 @@ pub struct SearchNode<VertexId> {
     pub lb: f64,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Edge<VertexId> {
     pub destination: VertexId,
     pub cost: f64,

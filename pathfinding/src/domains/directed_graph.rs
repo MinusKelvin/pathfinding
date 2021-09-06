@@ -5,6 +5,7 @@ pub struct DirectedGraph<V> {
     edges: usize,
 }
 
+#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 struct Vertex<V> {
     incoming: Vec<Edge<usize>>,
     outgoing: Vec<Edge<usize>>,
@@ -33,6 +34,11 @@ impl<V> DirectedGraph<V> {
     ///       vertices. if edge is present, runtime is logarithmic in the number of edges on the
     ///       relevant vertices.
     pub fn add_edge(&mut self, from: usize, to: usize, cost: f64) {
+        assert!(
+            from < self.vertices.len() && to < self.vertices.len(),
+            "from and to vertices must exist"
+        );
+
         let outgoing = &mut self.vertices[from].outgoing;
         match outgoing.binary_search_by_key(&to, |e| e.destination) {
             Ok(i) => outgoing[i].cost = cost,
@@ -62,8 +68,13 @@ impl<V> DirectedGraph<V> {
     }
 
     /// bulk loading method
-    pub fn add_edges(&mut self, edges: &[(usize, usize, f64)]) {
+    pub fn try_add_edges(&mut self, edges: &[(usize, usize, f64)]) -> Result<(), &'static str> {
+        let mut result = Ok(());
         for &(from, to, cost) in edges {
+            if from >= self.vertices.len() || to >= self.vertices.len() {
+                result = Err("Edge vertices don't exist");
+                break;
+            }
             self.vertices[from].outgoing.push(Edge {
                 destination: to,
                 cost,
@@ -98,6 +109,8 @@ impl<V> DirectedGraph<V> {
 
             self.edges += vertex.outgoing.len();
         }
+
+        result
     }
 
     pub fn vertex_data(&self, vertex: usize) -> &V {
@@ -139,5 +152,87 @@ impl<V> DirectedGraph<V> {
             .binary_search_by_key(&to, |e| e.destination)
             .ok()
             .map(|i| &self.vertices[from].outgoing[i])
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde {
+    use serde::ser::{SerializeSeq, SerializeStruct};
+    use serde::{Deserialize, Serialize};
+
+    impl<V: Serialize> Serialize for super::DirectedGraph<V> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            let mut s = serializer.serialize_struct("DirectedGraph", 2)?;
+            s.serialize_field(
+                "vertices",
+                &StreamingSequence {
+                    count: self.vertices.len(),
+                    iter: || self.vertices.iter().map(|v| &v.data),
+                },
+            )?;
+            s.serialize_field(
+                "edges",
+                &StreamingSequence {
+                    count: self.edges,
+                    iter: || {
+                        self.vertices.iter().enumerate().flat_map(|(from, v)| {
+                            v.outgoing
+                                .iter()
+                                .map(move |e| (from, e.destination, e.cost))
+                        })
+                    },
+                },
+            )?;
+            s.end()
+        }
+    }
+
+    struct StreamingSequence<F> {
+        count: usize,
+        iter: F,
+    }
+
+    impl<F, I, T> Serialize for StreamingSequence<F>
+    where
+        T: Serialize,
+        F: Fn() -> I,
+        I: Iterator<Item = T>,
+    {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            let mut s = serializer.serialize_seq(Some(self.count))?;
+            for v in (self.iter)() {
+                s.serialize_element(&v)?;
+            }
+            s.end()
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct DirectedGraphTransport<V> {
+        vertices: Vec<V>,
+        edges: Vec<(usize, usize, f64)>,
+    }
+
+    impl<'de, V: Deserialize<'de>> Deserialize<'de> for super::DirectedGraph<V> {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let v = DirectedGraphTransport::deserialize(deserializer)?;
+            let mut graph = super::DirectedGraph::new();
+            for data in v.vertices {
+                graph.add_vertex(data);
+            }
+            if let Err(e) = graph.try_add_edges(&v.edges) {
+                return Err(serde::de::Error::custom(e));
+            }
+            Ok(graph)
+        }
     }
 }
