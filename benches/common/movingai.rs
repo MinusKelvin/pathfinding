@@ -4,16 +4,19 @@ use std::path::Path;
 
 use pathfinding::domains::BitGrid;
 
-use crate::Instance;
+pub struct Problem {
+    pub from: (i32, i32),
+    pub to: (i32, i32),
+}
 
-pub fn load_scenario(scen: &Path) -> Result<(BitGrid, Vec<Instance>), MovingAiParseError> {
+pub fn load_scenario(scen: &Path) -> Result<(BitGrid, Vec<Problem>), MovingAiParseError> {
     let map = parse_map(&scen.with_extension("").with_extension("map"))?;
     let problems = parse_scen(scen, &map)?;
 
     Ok((map, problems))
 }
 
-fn parse_scen(scen: &Path, map: &BitGrid) -> Result<Vec<Instance>, MovingAiParseError> {
+fn parse_scen(scen: &Path, map: &BitGrid) -> Result<Vec<Problem>, MovingAiParseError> {
     let scen = BufReader::new(File::open(scen)?);
     let mut scen = scen.lines();
     let mut next = || match scen.next() {
@@ -54,7 +57,7 @@ fn parse_scen(scen: &Path, map: &BitGrid) -> Result<Vec<Instance>, MovingAiParse
             return Err(MovingAiParseError::InvalidData);
         }
 
-        problems.push(Instance {
+        problems.push(Problem {
             from: (start_x, start_y),
             to: (goal_x, goal_y),
         });
