@@ -61,6 +61,7 @@ pub fn astar<VertexId>(
 ///   expansion policy.
 /// - If a vertex ID is in-bounds of the expansion policy, then it must be in-bounds of the node
 ///   pool.
+#[inline(never)]
 pub unsafe fn astar_unchecked<VertexId>(
     pool: &mut impl NodePool<VertexId>,
     owner: &mut Owner,
